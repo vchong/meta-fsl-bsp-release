@@ -1,0 +1,222 @@
+From 699dd4b5f048a3e45852b8fa7b06daa103763ff2 Mon Sep 17 00:00:00 2001
+From: Edison Ai <edison.ai@arm.com>
+Date: Mon, 11 Sep 2017 14:05:02 +0800
+Subject: [PATCH 27/36] libmbedtls: support mbedtls DH function
+
+Implement DH function based on mbedtls.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Edison Ai <edison.ai@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/dh.c                      | 137 ++++++++++++++++++
+ lib/libmbedtls/core/stubbed.c                 |  23 ---
+ lib/libmbedtls/core/sub.mk                    |   1 +
+ .../include/mbedtls_config_kernel.h           |   4 +
+ 4 files changed, 142 insertions(+), 23 deletions(-)
+ create mode 100644 lib/libmbedtls/core/dh.c
+
+diff --git a/lib/libmbedtls/core/dh.c b/lib/libmbedtls/core/dh.c
+new file mode 100644
+index 00000000..dfc6dd8d
+--- /dev/null
++++ b/lib/libmbedtls/core/dh.c
+@@ -0,0 +1,137 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2018, ARM Limited
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <crypto/crypto.h>
++#include <mbedtls/ctr_drbg.h>
++#include <mbedtls/entropy.h>
++#include <mbedtls/dhm.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "mbd_rand.h"
++
++TEE_Result crypto_acipher_alloc_dh_keypair(struct dh_keypair *s,
++					   size_t key_size_bits)
++{
++	memset(s, 0, sizeof(*s));
++	s->g = crypto_bignum_allocate(key_size_bits);
++	if (!s->g)
++		goto err;
++	s->p = crypto_bignum_allocate(key_size_bits);
++	if (!s->p)
++		goto err;
++	s->y = crypto_bignum_allocate(key_size_bits);
++	if (!s->y)
++		goto err;
++	s->x = crypto_bignum_allocate(key_size_bits);
++	if (!s->x)
++		goto err;
++	s->q = crypto_bignum_allocate(key_size_bits);
++	if (!s->q)
++		goto err;
++	return TEE_SUCCESS;
++err:
++	crypto_bignum_free(s->g);
++	crypto_bignum_free(s->p);
++	crypto_bignum_free(s->y);
++	crypto_bignum_free(s->x);
++	return TEE_ERROR_OUT_OF_MEMORY;
++}
++
++TEE_Result crypto_acipher_gen_dh_key(struct dh_keypair *key,
++				     struct bignum *q __unused,
++				     size_t xbits)
++{
++	TEE_Result res = TEE_SUCCESS;
++	int lmd_res = 0;
++	mbedtls_dhm_context dhm;
++	unsigned char *buf = NULL;
++
++	memset(&dhm, 0, sizeof(dhm));
++	mbedtls_dhm_init(&dhm);
++
++	dhm.G = *(mbedtls_mpi *)key->g;
++	dhm.P = *(mbedtls_mpi *)key->p;
++
++	dhm.len = crypto_bignum_num_bytes(key->p);
++
++	if (xbits == 0)
++		xbits = dhm.len;
++	else
++		xbits = xbits / 8;
++
++	buf = malloc(dhm.len);
++	if (!buf) {
++		res = TEE_ERROR_OUT_OF_MEMORY;
++		goto out;
++	}
++	lmd_res = mbedtls_dhm_make_public(&dhm, (int)xbits, buf,
++					  dhm.len, mbd_rand, NULL);
++	if (lmd_res != 0) {
++		FMSG("mbedtls_dhm_make_public err, return is 0x%x", -lmd_res);
++		res = TEE_ERROR_BAD_PARAMETERS;
++	} else {
++		crypto_bignum_bin2bn(buf, xbits / 8, key->y);
++		crypto_bignum_copy(key->x, (void *)&dhm.X);
++		res = TEE_SUCCESS;
++	}
++out:
++	free(buf);
++	/* Reset mpi to skip freeing here, those mpis will be freed with key */
++	mbedtls_mpi_init(&dhm.G);
++	mbedtls_mpi_init(&dhm.P);
++	mbedtls_dhm_free(&dhm);
++	return res;
++}
++
++TEE_Result crypto_acipher_dh_shared_secret(struct dh_keypair *private_key,
++					   struct bignum *public_key,
++					   struct bignum *secret)
++{
++	TEE_Result res = TEE_SUCCESS;
++	int lmd_res = 0;
++	mbedtls_dhm_context dhm;
++	unsigned char *buf = NULL;
++	size_t olen = 0;
++
++	memset(&dhm, 0, sizeof(dhm));
++	mbedtls_dhm_init(&dhm);
++
++	dhm.G = *(mbedtls_mpi *)private_key->g;
++	dhm.P = *(mbedtls_mpi *)private_key->p;
++	dhm.GX = *(mbedtls_mpi *)private_key->y;
++	dhm.X = *(mbedtls_mpi *)private_key->x;
++	dhm.GY = *(mbedtls_mpi *)public_key;
++
++	dhm.len = crypto_bignum_num_bytes(private_key->p);
++
++	buf = malloc(dhm.len);
++	if (!buf) {
++		res = TEE_ERROR_OUT_OF_MEMORY;
++		goto out;
++	}
++
++	lmd_res = mbedtls_dhm_calc_secret(&dhm, buf, dhm.len,
++					  &olen, mbd_rand, NULL);
++	if (lmd_res != 0) {
++		FMSG("mbedtls_dhm_calc_secret failed, ret is 0x%x", -lmd_res);
++		res = TEE_ERROR_BAD_PARAMETERS;
++	} else {
++		crypto_bignum_bin2bn(buf, olen, secret);
++		res = TEE_SUCCESS;
++	}
++out:
++	free(buf);
++	/* Reset mpi to skip freeing here, those mpis will be freed with key */
++	mbedtls_mpi_init(&dhm.G);
++	mbedtls_mpi_init(&dhm.P);
++	mbedtls_mpi_init(&dhm.GX);
++	mbedtls_mpi_init(&dhm.X);
++	mbedtls_mpi_init(&dhm.GY);
++	mbedtls_dhm_free(&dhm);
++	return res;
++}
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+index c5682f52..b8f6b895 100644
+--- a/lib/libmbedtls/core/stubbed.c
++++ b/lib/libmbedtls/core/stubbed.c
+@@ -57,29 +57,6 @@ TEE_Result crypto_acipher_dsa_verify(uint32_t algo __unused,
+ }
+ #endif /* CFG_CRYPTO_DSA */
+ 
+-#if defined(CFG_CRYPTO_DH)
+-TEE_Result crypto_acipher_alloc_dh_keypair(struct dh_keypair *s __unused,
+-					   size_t key_size_bits __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-TEE_Result crypto_acipher_gen_dh_key(struct dh_keypair *key __unused,
+-				     struct bignum *q __unused,
+-				     size_t xbits __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-TEE_Result
+-crypto_acipher_dh_shared_secret(struct dh_keypair *private_key __unused,
+-				struct bignum *public_key __unused,
+-				struct bignum *secret __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-#endif /* CFG_CRYPTO_DH */
+-
+ #if defined(CFG_CRYPTO_ECC)
+ TEE_Result
+ crypto_acipher_alloc_ecc_public_key(struct ecc_public_key *s __unused,
+diff --git a/lib/libmbedtls/core/sub.mk b/lib/libmbedtls/core/sub.mk
+index 0c02798f..ff67e18f 100644
+--- a/lib/libmbedtls/core/sub.mk
++++ b/lib/libmbedtls/core/sub.mk
+@@ -25,3 +25,4 @@ srcs-$(CFG_CRYPTO_CMAC) += aes_cmac.c
+ srcs-$(call cfg-one-enabled, CFG_CRYPTO_RSA CFG_CRYPTO_DSA \
+ 			     CFG_CRYPTO_DH CFG_CRYPTO_ECC) += bignum.c
+ srcs-$(CFG_CRYPTO_RSA) += rsa.c
++srcs-$(CFG_CRYPTO_DH) += dh.c
+diff --git a/lib/libmbedtls/include/mbedtls_config_kernel.h b/lib/libmbedtls/include/mbedtls_config_kernel.h
+index b1950dbf..b3d71cdd 100644
+--- a/lib/libmbedtls/include/mbedtls_config_kernel.h
++++ b/lib/libmbedtls/include/mbedtls_config_kernel.h
+@@ -84,6 +84,10 @@
+ #define MBEDTLS_ASN1_WRITE_C
+ #endif
+ 
++#if defined(CFG_CRYPTO_DH)
++#define MBEDTLS_DHM_C
++#endif
++
+ #endif /*CFG_CRYPTOLIB_NAME_mbedtls*/
+ 
+ #include <mbedtls/check_config.h>
+-- 
+2.17.1
+

@@ -1,0 +1,110 @@
+From b01aa90a7c32d844ed192c321a02500426027e02 Mon Sep 17 00:00:00 2001
+From: Summer Qin <summer.qin@arm.com>
+Date: Mon, 2 Jul 2018 14:35:29 +0800
+Subject: [PATCH 22/36] libmbedtls: implement AES encrypt api
+
+These two implemented interfaces will be used by AES-GCM algo.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Summer Qin <summer.qin@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/aes.c     | 45 +++++++++++++++++++++++++++++++++++
+ lib/libmbedtls/core/stubbed.c | 16 -------------
+ lib/libmbedtls/core/sub.mk    |  1 +
+ 3 files changed, 46 insertions(+), 16 deletions(-)
+ create mode 100644 lib/libmbedtls/core/aes.c
+
+diff --git a/lib/libmbedtls/core/aes.c b/lib/libmbedtls/core/aes.c
+new file mode 100644
+index 00000000..4d317f0f
+--- /dev/null
++++ b/lib/libmbedtls/core/aes.c
+@@ -0,0 +1,45 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2018, ARM Limited
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <crypto/crypto.h>
++#include <kernel/panic.h>
++#include <mbedtls/aes.h>
++#include <string.h>
++
++TEE_Result crypto_aes_expand_enc_key(const void *key, size_t key_len,
++				     void *enc_key, size_t enc_keylen,
++				     unsigned int *rounds)
++{
++	mbedtls_aes_context ctx;
++
++	memset(&ctx, 0, sizeof(ctx));
++	mbedtls_aes_init(&ctx);
++	if (mbedtls_aes_setkey_enc(&ctx, key, key_len * 8) != 0)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	if (enc_keylen > sizeof(ctx.buf))
++		return TEE_ERROR_BAD_PARAMETERS;
++	memcpy(enc_key, ctx.buf, enc_keylen);
++	*rounds = ctx.nr;
++	mbedtls_aes_free(&ctx);
++	return TEE_SUCCESS;
++}
++
++void crypto_aes_enc_block(const void *enc_key, size_t enc_keylen,
++			  unsigned int rounds, const void *src, void *dst)
++{
++	mbedtls_aes_context ctx;
++
++	memset(&ctx, 0, sizeof(ctx));
++	mbedtls_aes_init(&ctx);
++	if (enc_keylen > sizeof(ctx.buf))
++		panic();
++	memcpy(ctx.buf, enc_key, enc_keylen);
++	ctx.rk = ctx.buf;
++	ctx.nr = rounds;
++	mbedtls_aes_encrypt(&ctx, src, dst);
++	mbedtls_aes_free(&ctx);
++}
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+index 2bbab959..58ddcf56 100644
+--- a/lib/libmbedtls/core/stubbed.c
++++ b/lib/libmbedtls/core/stubbed.c
+@@ -275,22 +275,6 @@ crypto_acipher_ecc_shared_secret(struct ecc_keypair *private_key __unused,
+ #endif /* CFG_CRYPTO_ECC */
+ 
+ 
+-TEE_Result crypto_aes_expand_enc_key(const void *key __unused,
+-				     size_t key_len __unused,
+-				     void *enc_key __unused,
+-				     size_t enc_keylen __unused,
+-				     unsigned int *rounds __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-void crypto_aes_enc_block(const void *enc_key __unused,
+-			  size_t enc_keylen __unused,
+-			  unsigned int rounds __unused,
+-			  const void *src __unused, void *dst __unused)
+-{
+-}
+-
+ /* Stubs for the crypto alloc ctx functions matching crypto_impl.h */
+ #undef CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED
+ 
+diff --git a/lib/libmbedtls/core/sub.mk b/lib/libmbedtls/core/sub.mk
+index 42ff2037..0626574d 100644
+--- a/lib/libmbedtls/core/sub.mk
++++ b/lib/libmbedtls/core/sub.mk
+@@ -7,6 +7,7 @@ srcs-$(call cfg-one-enabled, CFG_CRYPTO_MD5 CFG_CRYPTO_SHA1 CFG_CRYPTO_SHA224 \
+ 			     CFG_CRYPTO_SHA512) += hash.c
+ 
+ ifeq ($(CFG_CRYPTO_AES),y)
++srcs-y += aes.c
+ srcs-$(CFG_CRYPTO_ECB) += aes_ecb.c
+ srcs-$(CFG_CRYPTO_CBC) += aes_cbc.c
+ srcs-$(CFG_CRYPTO_CTR) += aes_ctr.c
+-- 
+2.17.1
+

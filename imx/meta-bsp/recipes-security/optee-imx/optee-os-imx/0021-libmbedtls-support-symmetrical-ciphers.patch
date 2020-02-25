@@ -1,0 +1,1011 @@
+From 94dfbb26b2efc39c53f8d721a1497e459a3fd0ac Mon Sep 17 00:00:00 2001
+From: Edison Ai <edison.ai@arm.com>
+Date: Tue, 9 Jan 2018 16:37:54 +0800
+Subject: [PATCH 21/36] libmbedtls: support symmetrical ciphers
+
+Adds support for symmetrical ciphers. The XTS mode is not supported in
+mbedTLS and will be dealt with later.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Edison Ai <edison.ai@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/aes_cbc.c                 | 120 ++++++++++++++++
+ lib/libmbedtls/core/aes_ctr.c                 | 115 ++++++++++++++++
+ lib/libmbedtls/core/aes_ecb.c                 | 122 +++++++++++++++++
+ lib/libmbedtls/core/des3_cbc.c                | 128 ++++++++++++++++++
+ lib/libmbedtls/core/des3_ecb.c                | 126 +++++++++++++++++
+ lib/libmbedtls/core/des_cbc.c                 | 121 +++++++++++++++++
+ lib/libmbedtls/core/des_ecb.c                 | 117 ++++++++++++++++
+ lib/libmbedtls/core/stubbed.c                 |  23 ----
+ lib/libmbedtls/core/sub.mk                    |  12 ++
+ .../include/mbedtls_config_kernel.h           |  17 +++
+ 10 files changed, 878 insertions(+), 23 deletions(-)
+ create mode 100644 lib/libmbedtls/core/aes_cbc.c
+ create mode 100644 lib/libmbedtls/core/aes_ctr.c
+ create mode 100644 lib/libmbedtls/core/aes_ecb.c
+ create mode 100644 lib/libmbedtls/core/des3_cbc.c
+ create mode 100644 lib/libmbedtls/core/des3_ecb.c
+ create mode 100644 lib/libmbedtls/core/des_cbc.c
+ create mode 100644 lib/libmbedtls/core/des_ecb.c
+
+diff --git a/lib/libmbedtls/core/aes_cbc.c b/lib/libmbedtls/core/aes_cbc.c
+new file mode 100644
+index 00000000..aa979698
+--- /dev/null
++++ b/lib/libmbedtls/core/aes_cbc.c
+@@ -0,0 +1,120 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/aes.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_aes_cbc_ctx {
++	struct crypto_cipher_ctx ctx;
++	int mbed_mode;
++	mbedtls_aes_context aes_ctx;
++	unsigned char iv[TEE_AES_BLOCK_SIZE];
++};
++
++static const struct crypto_cipher_ops mbed_aes_cbc_ops;
++
++static struct mbed_aes_cbc_ctx *to_aes_cbc_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_aes_cbc_ops);
++
++	return container_of(ctx, struct mbed_aes_cbc_ctx, ctx);
++}
++
++static TEE_Result mbed_aes_cbc_init(struct crypto_cipher_ctx *ctx,
++				    TEE_OperationMode mode, const uint8_t *key1,
++				    size_t key1_len,
++				    const uint8_t *key2 __unused,
++				    size_t key2_len __unused,
++				    const uint8_t *iv, size_t iv_len)
++{
++	struct mbed_aes_cbc_ctx *c = to_aes_cbc_ctx(ctx);
++	int mbed_res = 0;
++
++	if (iv_len != sizeof(c->iv))
++		return TEE_ERROR_BAD_PARAMETERS;
++	memcpy(c->iv, iv, sizeof(c->iv));
++
++	mbedtls_aes_init(&c->aes_ctx);
++
++	if (mode == TEE_MODE_ENCRYPT) {
++		c->mbed_mode = MBEDTLS_AES_ENCRYPT;
++		mbed_res = mbedtls_aes_setkey_enc(&c->aes_ctx, key1,
++						  key1_len * 8);
++	} else {
++		c->mbed_mode = MBEDTLS_AES_DECRYPT;
++		mbed_res = mbedtls_aes_setkey_dec(&c->aes_ctx, key1,
++						  key1_len * 8);
++	}
++
++	if (mbed_res)
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_aes_cbc_update(struct crypto_cipher_ctx *ctx,
++				      bool last_block __unused,
++				      const uint8_t *data, size_t len,
++				      uint8_t *dst)
++{
++	struct mbed_aes_cbc_ctx *c = to_aes_cbc_ctx(ctx);
++
++	if (mbedtls_aes_crypt_cbc(&c->aes_ctx, c->mbed_mode, len, c->iv,
++				  data, dst))
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_aes_cbc_final(struct crypto_cipher_ctx *ctx)
++{
++	mbedtls_aes_free(&to_aes_cbc_ctx(ctx)->aes_ctx);
++}
++
++static void mbed_aes_cbc_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_aes_cbc_ctx(ctx));
++}
++
++static void mbed_aes_cbc_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				    struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_aes_cbc_ctx *src = to_aes_cbc_ctx(src_ctx);
++	struct mbed_aes_cbc_ctx *dst = to_aes_cbc_ctx(dst_ctx);
++
++	memcpy(dst->iv, src->iv, sizeof(dst->iv));
++	dst->mbed_mode = src->mbed_mode;
++	dst->aes_ctx = src->aes_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_aes_cbc_ops = {
++	.init = mbed_aes_cbc_init,
++	.update = mbed_aes_cbc_update,
++	.final = mbed_aes_cbc_final,
++	.free_ctx = mbed_aes_cbc_free_ctx,
++	.copy_state = mbed_aes_cbc_copy_state,
++};
++
++TEE_Result crypto_aes_cbc_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_aes_cbc_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_aes_cbc_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/aes_ctr.c b/lib/libmbedtls/core/aes_ctr.c
+new file mode 100644
+index 00000000..3dc16c67
+--- /dev/null
++++ b/lib/libmbedtls/core/aes_ctr.c
+@@ -0,0 +1,115 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/aes.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_aes_ctr_ctx {
++	struct crypto_cipher_ctx ctx;
++	mbedtls_aes_context aes_ctx;
++	size_t nc_off;
++	unsigned char counter[TEE_AES_BLOCK_SIZE];
++	unsigned char block[TEE_AES_BLOCK_SIZE];
++};
++
++static const struct crypto_cipher_ops mbed_aes_ctr_ops;
++
++static struct mbed_aes_ctr_ctx *to_aes_ctr_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_aes_ctr_ops);
++
++	return container_of(ctx, struct mbed_aes_ctr_ctx, ctx);
++}
++
++static TEE_Result mbed_aes_ctr_init(struct crypto_cipher_ctx *ctx,
++				    TEE_OperationMode mode __unused,
++				    const uint8_t *key1, size_t key1_len,
++				    const uint8_t *key2 __unused,
++				    size_t key2_len __unused,
++				    const uint8_t *iv, size_t iv_len)
++{
++	struct mbed_aes_ctr_ctx *c = to_aes_ctr_ctx(ctx);
++
++	if (iv_len != sizeof(c->counter))
++		return TEE_ERROR_BAD_PARAMETERS;
++	memcpy(c->counter, iv, sizeof(c->counter));
++
++	mbedtls_aes_init(&c->aes_ctx);
++	c->nc_off = 0;
++
++	if (mbedtls_aes_setkey_enc(&c->aes_ctx, key1, key1_len * 8))
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_aes_ctr_update(struct crypto_cipher_ctx *ctx,
++				      bool last_block __unused,
++				      const uint8_t *data, size_t len,
++				      uint8_t *dst)
++{
++	struct mbed_aes_ctr_ctx *c = to_aes_ctr_ctx(ctx);
++
++	if (mbedtls_aes_crypt_ctr(&c->aes_ctx, len, &c->nc_off, c->counter,
++				   c->block, data, dst))
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_aes_ctr_final(struct crypto_cipher_ctx *ctx)
++{
++	struct mbed_aes_ctr_ctx *c = to_aes_ctr_ctx(ctx);
++
++	mbedtls_aes_free(&c->aes_ctx);
++	memset(c->block, 0, sizeof(c->block));
++}
++
++static void mbed_aes_ctr_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_aes_ctr_ctx(ctx));
++}
++
++static void mbed_aes_ctr_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				    struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_aes_ctr_ctx *src = to_aes_ctr_ctx(src_ctx);
++	struct mbed_aes_ctr_ctx *dst = to_aes_ctr_ctx(dst_ctx);
++
++	memcpy(dst->counter, src->counter, sizeof(dst->counter));
++	memcpy(dst->block, src->block, sizeof(dst->block));
++	dst->nc_off = src->nc_off;
++	dst->aes_ctx = src->aes_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_aes_ctr_ops = {
++	.init = mbed_aes_ctr_init,
++	.update = mbed_aes_ctr_update,
++	.final = mbed_aes_ctr_final,
++	.free_ctx = mbed_aes_ctr_free_ctx,
++	.copy_state = mbed_aes_ctr_copy_state,
++};
++
++TEE_Result crypto_aes_ctr_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_aes_ctr_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_aes_ctr_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/aes_ecb.c b/lib/libmbedtls/core/aes_ecb.c
+new file mode 100644
+index 00000000..58169f9b
+--- /dev/null
++++ b/lib/libmbedtls/core/aes_ecb.c
+@@ -0,0 +1,122 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/aes.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_aes_ecb_ctx {
++	struct crypto_cipher_ctx ctx;
++	int mbed_mode;
++	mbedtls_aes_context aes_ctx;
++};
++
++static const struct crypto_cipher_ops mbed_aes_ecb_ops;
++
++static struct mbed_aes_ecb_ctx *to_aes_ecb_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_aes_ecb_ops);
++
++	return container_of(ctx, struct mbed_aes_ecb_ctx, ctx);
++}
++
++static TEE_Result mbed_aes_ecb_init(struct crypto_cipher_ctx *ctx,
++				    TEE_OperationMode mode, const uint8_t *key1,
++				    size_t key1_len,
++				    const uint8_t *key2 __unused,
++				    size_t key2_len __unused,
++				    const uint8_t *iv __unused,
++				    size_t iv_len  __unused)
++{
++	struct mbed_aes_ecb_ctx *c = to_aes_ecb_ctx(ctx);
++	int mbed_res = 0;
++
++	mbedtls_aes_init(&c->aes_ctx);
++
++	if (mode == TEE_MODE_ENCRYPT) {
++		c->mbed_mode = MBEDTLS_AES_ENCRYPT;
++		mbed_res = mbedtls_aes_setkey_enc(&c->aes_ctx, key1,
++						  key1_len * 8);
++	} else {
++		c->mbed_mode = MBEDTLS_AES_DECRYPT;
++		mbed_res = mbedtls_aes_setkey_dec(&c->aes_ctx, key1,
++						  key1_len * 8);
++	}
++
++	if (mbed_res)
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_aes_ecb_update(struct crypto_cipher_ctx *ctx,
++				      bool last_block __unused,
++				      const uint8_t *data, size_t len,
++				      uint8_t *dst)
++{
++	struct mbed_aes_ecb_ctx *c = to_aes_ecb_ctx(ctx);
++	size_t block_size = TEE_AES_BLOCK_SIZE;
++	size_t offs = 0;
++
++	if (len % block_size)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	for (offs = 0; offs < len; offs += block_size) {
++		if (mbedtls_aes_crypt_ecb(&c->aes_ctx, c->mbed_mode,
++					  data + offs, dst + offs))
++			return TEE_ERROR_BAD_STATE;
++	}
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_aes_ecb_final(struct crypto_cipher_ctx *ctx)
++{
++	mbedtls_aes_free(&to_aes_ecb_ctx(ctx)->aes_ctx);
++}
++
++static void mbed_aes_ecb_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_aes_ecb_ctx(ctx));
++}
++
++static void mbed_aes_ecb_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				    struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_aes_ecb_ctx *src = to_aes_ecb_ctx(src_ctx);
++	struct mbed_aes_ecb_ctx *dst = to_aes_ecb_ctx(dst_ctx);
++
++	dst->mbed_mode = src->mbed_mode;
++	dst->aes_ctx = src->aes_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_aes_ecb_ops = {
++	.init = mbed_aes_ecb_init,
++	.update = mbed_aes_ecb_update,
++	.final = mbed_aes_ecb_final,
++	.free_ctx = mbed_aes_ecb_free_ctx,
++	.copy_state = mbed_aes_ecb_copy_state,
++};
++
++TEE_Result crypto_aes_ecb_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_aes_ecb_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_aes_ecb_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/des3_cbc.c b/lib/libmbedtls/core/des3_cbc.c
+new file mode 100644
+index 00000000..17dba177
+--- /dev/null
++++ b/lib/libmbedtls/core/des3_cbc.c
+@@ -0,0 +1,128 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/des.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_des3_cbc_ctx {
++	struct crypto_cipher_ctx ctx;
++	int mbed_mode;
++	mbedtls_des3_context des3_ctx;
++	unsigned char iv[TEE_DES_BLOCK_SIZE];
++};
++
++static const struct crypto_cipher_ops mbed_des3_cbc_ops;
++
++static struct mbed_des3_cbc_ctx *to_des3_cbc_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_des3_cbc_ops);
++
++	return container_of(ctx, struct mbed_des3_cbc_ctx, ctx);
++}
++
++static TEE_Result mbed_des3_cbc_init(struct crypto_cipher_ctx *ctx,
++				     TEE_OperationMode mode,
++				     const uint8_t *key1, size_t key1_len,
++				     const uint8_t *key2 __unused,
++				     size_t key2_len __unused,
++				     const uint8_t *iv __unused,
++				     size_t iv_len  __unused)
++{
++	struct mbed_des3_cbc_ctx *c = to_des3_cbc_ctx(ctx);
++	int mbed_res = 0;
++
++	if (key1_len != MBEDTLS_DES_KEY_SIZE * 2 &&
++	    key1_len != MBEDTLS_DES_KEY_SIZE * 3)
++		return TEE_ERROR_BAD_PARAMETERS;
++	if (iv_len != sizeof(c->iv))
++		return TEE_ERROR_BAD_PARAMETERS;
++	memcpy(c->iv, iv, sizeof(c->iv));
++
++	mbedtls_des3_init(&c->des3_ctx);
++
++	if (mode == TEE_MODE_ENCRYPT) {
++		c->mbed_mode = MBEDTLS_DES_ENCRYPT;
++		if (key1_len == MBEDTLS_DES_KEY_SIZE * 3)
++			mbed_res = mbedtls_des3_set3key_enc(&c->des3_ctx, key1);
++		else
++			mbed_res = mbedtls_des3_set2key_enc(&c->des3_ctx, key1);
++	} else {
++		c->mbed_mode = MBEDTLS_DES_DECRYPT;
++		if (key1_len == MBEDTLS_DES_KEY_SIZE * 3)
++			mbed_res = mbedtls_des3_set3key_dec(&c->des3_ctx, key1);
++		else
++			mbed_res = mbedtls_des3_set2key_dec(&c->des3_ctx, key1);
++	}
++
++	if (mbed_res)
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_des3_cbc_update(struct crypto_cipher_ctx *ctx,
++				       bool last_block __unused,
++				       const uint8_t *data, size_t len,
++				       uint8_t *dst)
++{
++	struct mbed_des3_cbc_ctx *c = to_des3_cbc_ctx(ctx);
++
++	if (mbedtls_des3_crypt_cbc(&c->des3_ctx, c->mbed_mode, len, c->iv,
++				   data, dst))
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_des3_cbc_final(struct crypto_cipher_ctx *ctx)
++{
++	mbedtls_des3_free(&to_des3_cbc_ctx(ctx)->des3_ctx);
++}
++
++static void mbed_des3_cbc_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_des3_cbc_ctx(ctx));
++}
++
++static void mbed_des3_cbc_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				     struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_des3_cbc_ctx *src = to_des3_cbc_ctx(src_ctx);
++	struct mbed_des3_cbc_ctx *dst = to_des3_cbc_ctx(dst_ctx);
++
++	memcpy(dst->iv, src->iv, sizeof(dst->iv));
++	dst->mbed_mode = src->mbed_mode;
++	dst->des3_ctx = src->des3_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_des3_cbc_ops = {
++	.init = mbed_des3_cbc_init,
++	.update = mbed_des3_cbc_update,
++	.final = mbed_des3_cbc_final,
++	.free_ctx = mbed_des3_cbc_free_ctx,
++	.copy_state = mbed_des3_cbc_copy_state,
++};
++
++TEE_Result crypto_des3_cbc_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_des3_cbc_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_des3_cbc_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/des3_ecb.c b/lib/libmbedtls/core/des3_ecb.c
+new file mode 100644
+index 00000000..56e3b8d7
+--- /dev/null
++++ b/lib/libmbedtls/core/des3_ecb.c
+@@ -0,0 +1,126 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/des.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_des3_ecb_ctx {
++	struct crypto_cipher_ctx ctx;
++	mbedtls_des3_context des3_ctx;
++};
++
++static const struct crypto_cipher_ops mbed_des3_ecb_ops;
++
++static struct mbed_des3_ecb_ctx *to_des3_ecb_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_des3_ecb_ops);
++
++	return container_of(ctx, struct mbed_des3_ecb_ctx, ctx);
++}
++
++static TEE_Result mbed_des3_ecb_init(struct crypto_cipher_ctx *ctx,
++				     TEE_OperationMode mode,
++				     const uint8_t *key1, size_t key1_len,
++				     const uint8_t *key2 __unused,
++				     size_t key2_len __unused,
++				     const uint8_t *iv __unused,
++				     size_t iv_len  __unused)
++{
++	struct mbed_des3_ecb_ctx *c = to_des3_ecb_ctx(ctx);
++	int mbed_res = 0;
++
++	if (key1_len != MBEDTLS_DES_KEY_SIZE * 2 &&
++	    key1_len != MBEDTLS_DES_KEY_SIZE * 3)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	mbedtls_des3_init(&c->des3_ctx);
++
++	if (key1_len == MBEDTLS_DES_KEY_SIZE * 3) {
++		if (mode == TEE_MODE_ENCRYPT)
++			mbed_res = mbedtls_des3_set3key_enc(&c->des3_ctx, key1);
++		else
++			mbed_res = mbedtls_des3_set3key_dec(&c->des3_ctx, key1);
++	} else {
++		if (mode == TEE_MODE_ENCRYPT)
++			mbed_res = mbedtls_des3_set2key_enc(&c->des3_ctx, key1);
++		else
++			mbed_res = mbedtls_des3_set2key_dec(&c->des3_ctx, key1);
++	}
++
++	if (mbed_res)
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_des3_ecb_update(struct crypto_cipher_ctx *ctx,
++				       bool last_block __unused,
++				       const uint8_t *data, size_t len,
++				       uint8_t *dst)
++{
++	struct mbed_des3_ecb_ctx *c = to_des3_ecb_ctx(ctx);
++	size_t block_size = TEE_DES_BLOCK_SIZE;
++	size_t offs = 0;
++
++	if (len % block_size)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	for (offs = 0; offs < len; offs += block_size) {
++		if (mbedtls_des3_crypt_ecb(&c->des3_ctx, data + offs,
++					   dst + offs))
++			return TEE_ERROR_BAD_STATE;
++	}
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_des3_ecb_final(struct crypto_cipher_ctx *ctx)
++{
++	mbedtls_des3_free(&to_des3_ecb_ctx(ctx)->des3_ctx);
++}
++
++static void mbed_des3_ecb_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_des3_ecb_ctx(ctx));
++}
++
++static void mbed_des3_ecb_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				     struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_des3_ecb_ctx *src = to_des3_ecb_ctx(src_ctx);
++	struct mbed_des3_ecb_ctx *dst = to_des3_ecb_ctx(dst_ctx);
++
++	dst->des3_ctx = src->des3_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_des3_ecb_ops = {
++	.init = mbed_des3_ecb_init,
++	.update = mbed_des3_ecb_update,
++	.final = mbed_des3_ecb_final,
++	.free_ctx = mbed_des3_ecb_free_ctx,
++	.copy_state = mbed_des3_ecb_copy_state,
++};
++
++TEE_Result crypto_des3_ecb_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_des3_ecb_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_des3_ecb_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/des_cbc.c b/lib/libmbedtls/core/des_cbc.c
+new file mode 100644
+index 00000000..a79b794d
+--- /dev/null
++++ b/lib/libmbedtls/core/des_cbc.c
+@@ -0,0 +1,121 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/des.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_des_cbc_ctx {
++	struct crypto_cipher_ctx ctx;
++	int mbed_mode;
++	mbedtls_des_context des_ctx;
++	unsigned char iv[TEE_DES_BLOCK_SIZE];
++};
++
++static const struct crypto_cipher_ops mbed_des_cbc_ops;
++
++static struct mbed_des_cbc_ctx *to_des_cbc_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_des_cbc_ops);
++
++	return container_of(ctx, struct mbed_des_cbc_ctx, ctx);
++}
++
++static TEE_Result mbed_des_cbc_init(struct crypto_cipher_ctx *ctx,
++				    TEE_OperationMode mode, const uint8_t *key1,
++				    size_t key1_len,
++				    const uint8_t *key2 __unused,
++				    size_t key2_len __unused,
++				    const uint8_t *iv __unused,
++				    size_t iv_len  __unused)
++{
++	struct mbed_des_cbc_ctx *c = to_des_cbc_ctx(ctx);
++	int mbed_res = 0;
++
++	if (key1_len != MBEDTLS_DES_KEY_SIZE)
++		return TEE_ERROR_BAD_PARAMETERS;
++	if (iv_len != sizeof(c->iv))
++		return TEE_ERROR_BAD_PARAMETERS;
++	memcpy(c->iv, iv, sizeof(c->iv));
++
++	mbedtls_des_init(&c->des_ctx);
++
++	if (mode == TEE_MODE_ENCRYPT) {
++		c->mbed_mode = MBEDTLS_DES_ENCRYPT;
++		mbed_res = mbedtls_des_setkey_enc(&c->des_ctx, key1);
++	} else {
++		c->mbed_mode = MBEDTLS_DES_DECRYPT;
++		mbed_res = mbedtls_des_setkey_dec(&c->des_ctx, key1);
++	}
++
++	if (mbed_res)
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_des_cbc_update(struct crypto_cipher_ctx *ctx,
++				      bool last_block __unused,
++				      const uint8_t *data, size_t len,
++				      uint8_t *dst)
++{
++	struct mbed_des_cbc_ctx *c = to_des_cbc_ctx(ctx);
++
++	if (mbedtls_des_crypt_cbc(&c->des_ctx, c->mbed_mode, len, c->iv,
++				  data, dst))
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_des_cbc_final(struct crypto_cipher_ctx *ctx)
++{
++	mbedtls_des_free(&to_des_cbc_ctx(ctx)->des_ctx);
++}
++
++static void mbed_des_cbc_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_des_cbc_ctx(ctx));
++}
++
++static void mbed_des_cbc_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				    struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_des_cbc_ctx *src = to_des_cbc_ctx(src_ctx);
++	struct mbed_des_cbc_ctx *dst = to_des_cbc_ctx(dst_ctx);
++
++	memcpy(dst->iv, src->iv, sizeof(dst->iv));
++	dst->mbed_mode = src->mbed_mode;
++	dst->des_ctx = src->des_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_des_cbc_ops = {
++	.init = mbed_des_cbc_init,
++	.update = mbed_des_cbc_update,
++	.final = mbed_des_cbc_final,
++	.free_ctx = mbed_des_cbc_free_ctx,
++	.copy_state = mbed_des_cbc_copy_state,
++};
++
++TEE_Result crypto_des_cbc_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_des_cbc_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_des_cbc_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/des_ecb.c b/lib/libmbedtls/core/des_ecb.c
+new file mode 100644
+index 00000000..38823a69
+--- /dev/null
++++ b/lib/libmbedtls/core/des_ecb.c
+@@ -0,0 +1,117 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <compiler.h>
++#include <crypto/crypto.h>
++#include <crypto/crypto_impl.h>
++#include <mbedtls/des.h>
++#include <stdlib.h>
++#include <string.h>
++#include <tee_api_types.h>
++#include <utee_defines.h>
++#include <util.h>
++
++struct mbed_des_ecb_ctx {
++	struct crypto_cipher_ctx ctx;
++	mbedtls_des_context des_ctx;
++};
++
++static const struct crypto_cipher_ops mbed_des_ecb_ops;
++
++static struct mbed_des_ecb_ctx *to_des_ecb_ctx(struct crypto_cipher_ctx *ctx)
++{
++	assert(ctx && ctx->ops == &mbed_des_ecb_ops);
++
++	return container_of(ctx, struct mbed_des_ecb_ctx, ctx);
++}
++
++static TEE_Result mbed_des_ecb_init(struct crypto_cipher_ctx *ctx,
++				    TEE_OperationMode mode, const uint8_t *key1,
++				    size_t key1_len,
++				    const uint8_t *key2 __unused,
++				    size_t key2_len __unused,
++				    const uint8_t *iv __unused,
++				    size_t iv_len  __unused)
++{
++	struct mbed_des_ecb_ctx *c = to_des_ecb_ctx(ctx);
++	int mbed_res = 0;
++
++	if (key1_len != MBEDTLS_DES_KEY_SIZE)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	mbedtls_des_init(&c->des_ctx);
++
++	if (mode == TEE_MODE_ENCRYPT)
++		mbed_res = mbedtls_des_setkey_enc(&c->des_ctx, key1);
++	else
++		mbed_res = mbedtls_des_setkey_dec(&c->des_ctx, key1);
++
++	if (mbed_res)
++		return TEE_ERROR_BAD_STATE;
++
++	return TEE_SUCCESS;
++}
++
++static TEE_Result mbed_des_ecb_update(struct crypto_cipher_ctx *ctx,
++				      bool last_block __unused,
++				      const uint8_t *data, size_t len,
++				      uint8_t *dst)
++{
++	struct mbed_des_ecb_ctx *c = to_des_ecb_ctx(ctx);
++	size_t block_size = TEE_DES_BLOCK_SIZE;
++	size_t offs = 0;
++
++	if (len % block_size)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	for (offs = 0; offs < len; offs += block_size) {
++		if (mbedtls_des_crypt_ecb(&c->des_ctx, data + offs, dst + offs))
++			return TEE_ERROR_BAD_STATE;
++	}
++
++	return TEE_SUCCESS;
++}
++
++static void mbed_des_ecb_final(struct crypto_cipher_ctx *ctx)
++{
++	mbedtls_des_free(&to_des_ecb_ctx(ctx)->des_ctx);
++}
++
++static void mbed_des_ecb_free_ctx(struct crypto_cipher_ctx *ctx)
++{
++	free(to_des_ecb_ctx(ctx));
++}
++
++static void mbed_des_ecb_copy_state(struct crypto_cipher_ctx *dst_ctx,
++				    struct crypto_cipher_ctx *src_ctx)
++{
++	struct mbed_des_ecb_ctx *src = to_des_ecb_ctx(src_ctx);
++	struct mbed_des_ecb_ctx *dst = to_des_ecb_ctx(dst_ctx);
++
++	dst->des_ctx = src->des_ctx;
++}
++
++static const struct crypto_cipher_ops mbed_des_ecb_ops = {
++	.init = mbed_des_ecb_init,
++	.update = mbed_des_ecb_update,
++	.final = mbed_des_ecb_final,
++	.free_ctx = mbed_des_ecb_free_ctx,
++	.copy_state = mbed_des_ecb_copy_state,
++};
++
++TEE_Result crypto_des_ecb_alloc_ctx(struct crypto_cipher_ctx **ctx_ret)
++{
++	struct mbed_des_ecb_ctx *c = NULL;
++
++	c = calloc(1, sizeof(*c));
++	if (!c)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	c->ctx.ops = &mbed_des_ecb_ops;
++	*ctx_ret = &c->ctx;
++
++	return TEE_SUCCESS;
++}
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+index 914857b4..2bbab959 100644
+--- a/lib/libmbedtls/core/stubbed.c
++++ b/lib/libmbedtls/core/stubbed.c
+@@ -311,33 +311,10 @@ CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(hmac_sha512, mac)
+ #if defined(CFG_CRYPTO_CMAC)
+ CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_cmac, mac)
+ #endif
+-
+-#if defined(CFG_CRYPTO_AES) && defined(CFG_CRYPTO_ECB)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_ecb, cipher)
+-#endif
+-
+-#if defined(CFG_CRYPTO_AES) && defined(CFG_CRYPTO_CBC)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_cbc, cipher)
+-#endif
+-
+-#if defined(CFG_CRYPTO_AES) && defined(CFG_CRYPTO_CTR)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_ctr, cipher)
+-#endif
+-
+ #if defined(CFG_CRYPTO_AES) && defined(CFG_CRYPTO_XTS)
+ CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_xts, cipher)
+ #endif
+ 
+-#if defined(CFG_CRYPTO_DES) && defined(CFG_CRYPTO_ECB)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(des_ecb, cipher)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(des3_ecb, cipher)
+-#endif
+-
+-#if defined(CFG_CRYPTO_DES) && defined(CFG_CRYPTO_CBC)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(des_cbc, cipher)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(des3_cbc, cipher)
+-#endif
+-
+ #if defined(CFG_CRYPTO_CCM)
+ CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_ccm, authenc)
+ #endif
+diff --git a/lib/libmbedtls/core/sub.mk b/lib/libmbedtls/core/sub.mk
+index 6c5d6858..42ff2037 100644
+--- a/lib/libmbedtls/core/sub.mk
++++ b/lib/libmbedtls/core/sub.mk
+@@ -5,3 +5,15 @@ srcs-y += tomcrypt.c
+ srcs-$(call cfg-one-enabled, CFG_CRYPTO_MD5 CFG_CRYPTO_SHA1 CFG_CRYPTO_SHA224 \
+ 			     CFG_CRYPTO_SHA256 CFG_CRYPTO_SHA384 \
+ 			     CFG_CRYPTO_SHA512) += hash.c
++
++ifeq ($(CFG_CRYPTO_AES),y)
++srcs-$(CFG_CRYPTO_ECB) += aes_ecb.c
++srcs-$(CFG_CRYPTO_CBC) += aes_cbc.c
++srcs-$(CFG_CRYPTO_CTR) += aes_ctr.c
++endif
++ifeq ($(CFG_CRYPTO_DES),y)
++srcs-$(CFG_CRYPTO_ECB) += des_ecb.c
++srcs-$(CFG_CRYPTO_ECB) += des3_ecb.c
++srcs-$(CFG_CRYPTO_CBC) += des_cbc.c
++srcs-$(CFG_CRYPTO_CBC) += des3_cbc.c
++endif
+diff --git a/lib/libmbedtls/include/mbedtls_config_kernel.h b/lib/libmbedtls/include/mbedtls_config_kernel.h
+index d2d9e8b7..0c8ad37f 100644
+--- a/lib/libmbedtls/include/mbedtls_config_kernel.h
++++ b/lib/libmbedtls/include/mbedtls_config_kernel.h
+@@ -37,6 +37,23 @@
+ #define MBEDTLS_MD_C
+ #endif
+ 
++#if defined(CFG_CRYPTO_AES)
++#define MBEDTLS_AES_C
++#define MBEDTLS_AES_ROM_TABLES
++#endif
++
++#if defined(CFG_CRYPTO_DES)
++#define MBEDTLS_DES_C
++#endif
++
++#if defined(CFG_CRYPTO_CBC)
++#define MBEDTLS_CIPHER_MODE_CBC
++#endif
++
++#if defined(CFG_CRYPTO_CTR)
++#define MBEDTLS_CIPHER_MODE_CTR
++#endif
++
+ #endif /*CFG_CRYPTOLIB_NAME_mbedtls*/
+ 
+ #include <mbedtls/check_config.h>
+-- 
+2.17.1
+

@@ -1,0 +1,57 @@
+From ecfc9c716cddce2f85790a289cf713bec5df69c0 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Wed, 17 Apr 2019 12:25:20 +0200
+Subject: [PATCH 33/36] libmbedtls: mbedtls_mpi_exp_mod() initialize W
+
+ae499f6a39f3 ("libmbedtls: mbedtls_mpi_exp_mod() initialize W") from
+branch import/mbedtls-2.16.0
+
+Initialize W using mbedtls_mpi_init_mempool() instead of memset() to
+ensure that the temporary variable uses the designated memory pool if
+configured.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/mbedtls/library/bignum.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/lib/libmbedtls/mbedtls/library/bignum.c b/lib/libmbedtls/mbedtls/library/bignum.c
+index 1c0e6758..5d4beca4 100644
+--- a/lib/libmbedtls/mbedtls/library/bignum.c
++++ b/lib/libmbedtls/mbedtls/library/bignum.c
+@@ -60,6 +60,7 @@
+ #endif
+ 
+ #include <mempool.h>
++#include <util.h>
+ 
+ #define MPI_VALIDATE_RET( cond )                                       \
+     MBEDTLS_INTERNAL_VALIDATE_RET( cond, MBEDTLS_ERR_MPI_BAD_INPUT_DATA )
+@@ -1805,7 +1806,8 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+     mbedtls_mpi_montg_init( &mm, N );
+     mbedtls_mpi_init_mempool( &RR ); mbedtls_mpi_init_mempool( &T );
+     mbedtls_mpi_init_mempool( &Apos );
+-    memset( W, 0, sizeof( W ) );
++    for( i = 0; i < ARRAY_SIZE(W); i++ )
++        mbedtls_mpi_init_mempool( W + i );
+ 
+     i = mbedtls_mpi_bitlen( E );
+ 
+@@ -1977,10 +1979,10 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+ 
+ cleanup:
+ 
+-    for( i = ( one << ( wsize - 1 ) ); i < ( one << wsize ); i++ )
+-        mbedtls_mpi_free( &W[i] );
++    for( i = 0; i < ARRAY_SIZE(W); i++ )
++        mbedtls_mpi_free( W + i );
+ 
+-    mbedtls_mpi_free( &W[1] ); mbedtls_mpi_free( &T ); mbedtls_mpi_free( &Apos );
++    mbedtls_mpi_free( &T ); mbedtls_mpi_free( &Apos );
+ 
+     if( _RR == NULL || _RR->p == NULL )
+         mbedtls_mpi_free( &RR );
+-- 
+2.17.1
+

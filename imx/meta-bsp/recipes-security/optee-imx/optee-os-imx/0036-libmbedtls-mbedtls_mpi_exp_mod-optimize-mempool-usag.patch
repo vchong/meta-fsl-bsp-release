@@ -1,0 +1,100 @@
+From e9667475500c842b943e3f457ea88236e4e9ab5c Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Mon, 27 May 2019 16:42:58 +0200
+Subject: [PATCH 36/36] libmbedtls: mbedtls_mpi_exp_mod(): optimize mempool
+ usage
+
+d5572fade852 ("libmbedtls: mbedtls_mpi_exp_mod(): optimize mempool
+usage") from branch import/mbedtls-2.16.0
+
+With W allocated in the mempool instead of the stack it is more important
+to utilize the mempool in a stack like way.
+
+With this patch allocation and initialization of W is moved to a point
+where all following mempool allocations are free before the function
+returns.
+
+This reduces maximum memory consumption of mempool in regression case
+8101 for an AArch64 TA in from 17280 to 7640 bytes. Figures for an
+AArch32 TA are 12040 to 5288 bytes.
+
+Reviewed-by: Joakim Bech <joakim.bech@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/mbedtls/library/bignum.c | 26 ++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/lib/libmbedtls/mbedtls/library/bignum.c b/lib/libmbedtls/mbedtls/library/bignum.c
+index 4c1840a0..e947a1ca 100644
+--- a/lib/libmbedtls/mbedtls/library/bignum.c
++++ b/lib/libmbedtls/mbedtls/library/bignum.c
+@@ -1789,7 +1789,7 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+     size_t bufsize, nbits;
+     mbedtls_mpi_uint ei, mm, state;
+     mbedtls_mpi RR, T, Apos;
+-    mbedtls_mpi *W;
++    mbedtls_mpi *W = NULL;
+     const size_t array_size_W = 2 << MBEDTLS_MPI_WINDOW_SIZE;
+     int neg;
+ 
+@@ -1804,19 +1804,12 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+     if( mbedtls_mpi_cmp_int( E, 0 ) < 0 )
+         return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
+ 
+-    W = mempool_alloc( mbedtls_mpi_mempool,
+-                       sizeof( mbedtls_mpi ) * array_size_W );
+-    if( W == NULL )
+-        return( MBEDTLS_ERR_MPI_ALLOC_FAILED );
+-
+     /*
+      * Init temps and window size
+      */
+     mbedtls_mpi_montg_init( &mm, N );
+     mbedtls_mpi_init_mempool( &RR ); mbedtls_mpi_init_mempool( &T );
+     mbedtls_mpi_init_mempool( &Apos );
+-    for( i = 0; i < array_size_W; i++ )
+-        mbedtls_mpi_init_mempool( W + i );
+ 
+     i = mbedtls_mpi_bitlen( E );
+ 
+@@ -1828,7 +1821,7 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+ 
+     j = N->n + 1;
+     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, j ) );
+-    MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &W[1],  j ) );
++
+     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &T, j * 2 ) );
+ 
+     /*
+@@ -1857,6 +1850,16 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+     else
+         memcpy( &RR, _RR, sizeof( mbedtls_mpi ) );
+ 
++    W = mempool_alloc( mbedtls_mpi_mempool,
++                       sizeof( mbedtls_mpi ) * array_size_W );
++    if( W == NULL ) {
++        ret = MBEDTLS_ERR_MPI_ALLOC_FAILED;
++        goto cleanup;
++    }
++    for( i = 0; i < array_size_W; i++ )
++        mbedtls_mpi_init_mempool( W + i );
++    MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &W[1],  j ) );
++
+     /*
+      * W[1] = A * R^2 * R^-1 mod N = A * R mod N
+      */
+@@ -1988,8 +1991,9 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
+ 
+ cleanup:
+ 
+-    for( i = 0; i < array_size_W; i++ )
+-        mbedtls_mpi_free( W + i );
++    if( W )
++        for( i = 0; i < array_size_W; i++ )
++            mbedtls_mpi_free( W + i );
+     mempool_free( mbedtls_mpi_mempool , W );
+ 
+     mbedtls_mpi_free( &T ); mbedtls_mpi_free( &Apos );
+-- 
+2.17.1
+

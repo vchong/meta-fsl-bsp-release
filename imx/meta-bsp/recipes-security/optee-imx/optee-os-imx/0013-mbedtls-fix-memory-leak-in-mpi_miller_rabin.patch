@@ -1,0 +1,36 @@
+From ab7910b5edd3280b093de9f7c82b2c289eb75c82 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Thu, 17 Jan 2019 11:14:38 +0100
+Subject: [PATCH 13/36] mbedtls: fix memory leak in mpi_miller_rabin()
+
+8ff963a60211 ("mbedtls: fix memory leak in mpi_miller_rabin()") from
+branch import/mbedtls-2.6.1
+
+Fixes memory leak in mpi_miller_rabin() that occurs when the function has
+failed to obtain a usable random 'A' 300 turns in a row.
+
+Reviewed-by: Joakim Bech <joakim.bech@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/mbedtls/library/bignum.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/lib/libmbedtls/mbedtls/library/bignum.c b/lib/libmbedtls/mbedtls/library/bignum.c
+index a09ab0a6..405cf524 100644
+--- a/lib/libmbedtls/mbedtls/library/bignum.c
++++ b/lib/libmbedtls/mbedtls/library/bignum.c
+@@ -2179,8 +2179,9 @@ static int mpi_miller_rabin( const mbedtls_mpi *X,
+                 MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &A, j - k ) );
+             }
+ 
+-            if (count++ > 30) {
+-                return MBEDTLS_ERR_MPI_NOT_ACCEPTABLE;
++            if (count++ > 300) {
++                ret = MBEDTLS_ERR_MPI_NOT_ACCEPTABLE;
++                goto cleanup;
+             }
+ 
+         } while ( mbedtls_mpi_cmp_mpi( &A, &W ) >= 0 ||
+-- 
+2.17.1
+

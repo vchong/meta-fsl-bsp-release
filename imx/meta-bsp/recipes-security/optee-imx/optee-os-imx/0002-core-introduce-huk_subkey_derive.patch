@@ -1,0 +1,158 @@
+From be32bf52a1b201476de51d56cc14c5c742191bb3 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Thu, 25 Apr 2019 14:57:10 +0200
+Subject: [PATCH 02/36] core: introduce huk_subkey_derive()
+
+The hardware unique key should preferably only be used to generate other
+keys. This is encouraged with  huk_subkey_derive() which is used to
+derive a subkey from the hardware unique key.
+
+Reviewed-by: Joakim Bech <joakim.bech@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ core/include/kernel/huk_subkey.h | 54 ++++++++++++++++++++++++++++
+ core/kernel/huk_subkey.c         | 60 ++++++++++++++++++++++++++++++++
+ core/kernel/sub.mk               |  2 ++
+ 3 files changed, 116 insertions(+)
+ create mode 100644 core/include/kernel/huk_subkey.h
+ create mode 100644 core/kernel/huk_subkey.c
+
+diff --git a/core/include/kernel/huk_subkey.h b/core/include/kernel/huk_subkey.h
+new file mode 100644
+index 00000000..589c1d2a
+--- /dev/null
++++ b/core/include/kernel/huk_subkey.h
+@@ -0,0 +1,54 @@
++/* SPDX-License-Identifier: BSD-2-Clause */
++/*
++ * Copyright (c) 2019, Linaro Limited
++ */
++
++#ifndef __KERNEL_HUK_SUBKEY_H
++#define __KERNEL_HUK_SUBKEY_H
++
++#include <tee_api_types.h>
++#include <types_ext.h>
++#include <utee_defines.h>
++
++/*
++ * enum huk_subkey_usage - subkey usage identifier
++ * @HUK_SUBKEY_RPMB:	RPMB key
++ * @HUK_SUBKEY_SSK:	Secure Storage key
++ * @HUK_SUBKEY_DIE_ID:	Representing the die ID
++ *
++ * Add more identifiers as needed, be careful to not change the already
++ * assigned numbers as that will affect the derived subkey.
++ */
++enum huk_subkey_usage {
++	/*
++	 * All IDs are explicitly assigned to make it easier to keep then
++	 * constant.
++	 */
++	HUK_SUBKEY_RPMB = 0,
++	HUK_SUBKEY_SSK = 1,
++	HUK_SUBKEY_DIE_ID = 2,
++};
++
++#define HUK_SUBKEY_MAX_LEN	TEE_SHA256_HASH_SIZE
++
++/*
++ * huk_subkey_derive() - Derive a subkey from the hardware unique key
++ * @usage:		Intended usage of the subkey
++ * @const_data:		Constant data to generate different subkeys with
++ *			the same usage
++ * @const_data_len:	Length of constant data
++ * @subkey:		Generated subkey
++ * @subkey_len:		Required size of the subkey, sizes larger than
++ *			HUK_SUBKEY_MAX_LEN are not accepted.
++ *
++ * Returns a subkey derived from the hardware unique key. Given the same
++ * input the same subkey is returned each time.
++ *
++ * Return TEE_SUCCES on success or an error code on failure.
++ */
++TEE_Result huk_subkey_derive(enum huk_subkey_usage usage,
++			     const void *const_data, size_t const_data_len,
++			     uint8_t *subkey, size_t subkey_len);
++
++
++#endif /*__KERNEL_HUK_SUBKEY_H*/
+diff --git a/core/kernel/huk_subkey.c b/core/kernel/huk_subkey.c
+new file mode 100644
+index 00000000..7d6e5bf4
+--- /dev/null
++++ b/core/kernel/huk_subkey.c
+@@ -0,0 +1,60 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (c) 2019, Linaro Limited
++ */
++
++#include <crypto/crypto.h>
++#include <kernel/huk_subkey.h>
++#include <kernel/tee_common_otp.h>
++
++static TEE_Result mac_usage(void *ctx, uint32_t usage)
++{
++	return crypto_mac_update(ctx, TEE_ALG_HMAC_SHA256,
++				 (const void *)&usage, sizeof(usage));
++}
++
++TEE_Result huk_subkey_derive(enum huk_subkey_usage usage,
++			     const void *const_data, size_t const_data_len,
++			     uint8_t *subkey, size_t subkey_len)
++{
++	void *ctx = NULL;
++	struct tee_hw_unique_key huk = { };
++	TEE_Result res = TEE_SUCCESS;
++
++	if (subkey_len > HUK_SUBKEY_MAX_LEN)
++		return TEE_ERROR_BAD_PARAMETERS;
++	if (!const_data && const_data_len)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	res = crypto_mac_alloc_ctx(&ctx, TEE_ALG_HMAC_SHA256);
++	if (res)
++		return res;
++
++	res = tee_otp_get_hw_unique_key(&huk);
++	if (res)
++		goto out;
++
++	res = crypto_mac_init(ctx, TEE_ALG_HMAC_SHA256, huk.data,
++			      sizeof(huk.data));
++	if (res)
++		goto out;
++
++	res = mac_usage(ctx, usage);
++	if (res)
++		goto out;
++
++	if (const_data) {
++		res = crypto_mac_update(ctx, TEE_ALG_HMAC_SHA256, const_data,
++					const_data_len);
++		if (res)
++			goto out;
++	}
++
++	res = crypto_mac_final(ctx, TEE_ALG_HMAC_SHA256, subkey, subkey_len);
++out:
++	if (res)
++		memset(subkey, 0, subkey_len);
++	memset(&huk, 0, sizeof(huk));
++	crypto_mac_free_ctx(ctx, TEE_ALG_HMAC_SHA256);
++	return res;
++}
+diff --git a/core/kernel/sub.mk b/core/kernel/sub.mk
+index 093a74e5..ed807616 100644
+--- a/core/kernel/sub.mk
++++ b/core/kernel/sub.mk
+@@ -12,3 +12,5 @@ srcs-$(CFG_CORE_SANITIZE_KADDRESS) += asan.c
+ cflags-remove-asan.c-y += $(cflags_kasan)
+ srcs-y += refcount.c
+ srcs-y += pm.c
++srcs-y += scattered_array.c
++srcs-y += huk_subkey.c
+-- 
+2.17.1
+

@@ -1,0 +1,67 @@
+From 27de9fac506c43c179c638b7950ba3634d43982b Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Thu, 21 Mar 2019 12:15:01 +0100
+Subject: [PATCH 31/36] mbedtls: Support AES-CCM algorithm
+
+Use AES-CCM implementation from libtomcrypt instead of mbedtls version
+due to limitations in the mbedtls API.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/stubbed.c | 31 -------------------------------
+ lib/libmbedtls/core/sub.mk    |  1 -
+ 2 files changed, 32 deletions(-)
+ delete mode 100644 lib/libmbedtls/core/stubbed.c
+
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+deleted file mode 100644
+index 30ff8f2f..00000000
+--- a/lib/libmbedtls/core/stubbed.c
++++ /dev/null
+@@ -1,31 +0,0 @@
+-// SPDX-License-Identifier: BSD-2-Clause
+-/*
+- * Copyright (C) 2018, ARM Limited
+- * Copyright (C) 2019, Linaro Limited
+- */
+-
+-#include <assert.h>
+-#include <compiler.h>
+-#include <crypto/crypto.h>
+-#include <crypto/crypto_impl.h>
+-#include <kernel/panic.h>
+-#include <stdlib.h>
+-
+-/******************************************************************************
+- * Asymmetric algorithms
+- ******************************************************************************/
+-
+-
+-
+-
+-/* Stubs for the crypto alloc ctx functions matching crypto_impl.h */
+-#undef CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED
+-
+-#define CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(name, type) \
+-	TEE_Result \
+-	crypto_##name##_alloc_ctx(struct crypto_##type##_ctx **ctx __unused) \
+-	{ return TEE_ERROR_NOT_IMPLEMENTED; }
+-
+-#if defined(CFG_CRYPTO_CCM)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_ccm, authenc)
+-#endif
+diff --git a/lib/libmbedtls/core/sub.mk b/lib/libmbedtls/core/sub.mk
+index 614d04cc..634e55cb 100644
+--- a/lib/libmbedtls/core/sub.mk
++++ b/lib/libmbedtls/core/sub.mk
+@@ -1,6 +1,5 @@
+ cflags-lib-$(CFG_CRYPTO_SIZE_OPTIMIZATION) += -Os
+ 
+-srcs-y += stubbed.c
+ srcs-y += tomcrypt.c
+ srcs-$(call cfg-one-enabled, CFG_CRYPTO_MD5 CFG_CRYPTO_SHA1 CFG_CRYPTO_SHA224 \
+ 			     CFG_CRYPTO_SHA256 CFG_CRYPTO_SHA384 \
+-- 
+2.17.1
+

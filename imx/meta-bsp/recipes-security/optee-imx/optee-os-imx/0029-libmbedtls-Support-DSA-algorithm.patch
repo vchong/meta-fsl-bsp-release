@@ -1,0 +1,100 @@
+From 6b366d326b95bb0681bfbc1f25ea07f8c6a6e7d2 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Wed, 27 Mar 2019 19:13:05 +0100
+Subject: [PATCH 29/36] libmbedtls: Support DSA algorithm
+
+DSA is not supported in MbedTLS, use libtomcrypt instead.
+
+Acked-by: Jerome Forissier <jerome.forissier@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/stubbed.c                 | 40 -------------------
+ lib/libmbedtls/core/sub.mk                    |  6 ++-
+ .../include/mbedtls_config_kernel.h           |  3 +-
+ 3 files changed, 5 insertions(+), 44 deletions(-)
+
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+index 359d6551..5f1dec1e 100644
+--- a/lib/libmbedtls/core/stubbed.c
++++ b/lib/libmbedtls/core/stubbed.c
+@@ -16,46 +16,6 @@
+  ******************************************************************************/
+ 
+ 
+-#if defined(CFG_CRYPTO_DSA)
+-TEE_Result crypto_acipher_alloc_dsa_keypair(struct dsa_keypair *s __unused,
+-					    size_t key_size_bits __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-TEE_Result
+-crypto_acipher_alloc_dsa_public_key(struct dsa_public_key *s __unused,
+-				    size_t key_size_bits __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-TEE_Result crypto_acipher_gen_dsa_key(struct dsa_keypair *key __unused,
+-				      size_t key_size __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-TEE_Result crypto_acipher_dsa_sign(uint32_t algo __unused,
+-				   struct dsa_keypair *key __unused,
+-				   const uint8_t *msg __unused,
+-				   size_t msg_len __unused,
+-				   uint8_t *sig __unused,
+-				   size_t *sig_len __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-TEE_Result crypto_acipher_dsa_verify(uint32_t algo __unused,
+-				     struct dsa_public_key *key __unused,
+-				     const uint8_t *msg __unused,
+-				     size_t msg_len __unused,
+-				     const uint8_t *sig __unused,
+-				     size_t sig_len __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-#endif /* CFG_CRYPTO_DSA */
+ 
+ 
+ /* Stubs for the crypto alloc ctx functions matching crypto_impl.h */
+diff --git a/lib/libmbedtls/core/sub.mk b/lib/libmbedtls/core/sub.mk
+index dc26286c..614d04cc 100644
+--- a/lib/libmbedtls/core/sub.mk
++++ b/lib/libmbedtls/core/sub.mk
+@@ -22,8 +22,10 @@ endif
+ srcs-$(CFG_CRYPTO_HMAC) += hmac.c
+ srcs-$(CFG_CRYPTO_CMAC) += aes_cmac.c
+ 
+-srcs-$(call cfg-one-enabled, CFG_CRYPTO_RSA CFG_CRYPTO_DSA \
+-			     CFG_CRYPTO_DH CFG_CRYPTO_ECC) += bignum.c
++ifneq ($(CFG_CRYPTO_DSA),y)
++srcs-$(call cfg-one-enabled, CFG_CRYPTO_RSA  CFG_CRYPTO_DH \
++			     CFG_CRYPTO_ECC) += bignum.c
++endif
+ srcs-$(CFG_CRYPTO_RSA) += rsa.c
+ srcs-$(CFG_CRYPTO_DH) += dh.c
+ srcs-$(CFG_CRYPTO_ECC) += ecc.c
+diff --git a/lib/libmbedtls/include/mbedtls_config_kernel.h b/lib/libmbedtls/include/mbedtls_config_kernel.h
+index d8ade1d3..63f8d5de 100644
+--- a/lib/libmbedtls/include/mbedtls_config_kernel.h
++++ b/lib/libmbedtls/include/mbedtls_config_kernel.h
+@@ -63,8 +63,7 @@
+ #define MBEDTLS_CIPHER_C
+ #endif
+ 
+-#if defined(CFG_CRYPTO_RSA) || defined(CFG_CRYPTO_DSA) || \
+-    defined(CFG_CRYPTO_DH) || defined(CFG_CRYPTO_ECC)
++#if defined(CFG_CRYPTO_RSA) || defined(CFG_CRYPTO_DH) || defined(CFG_CRYPTO_ECC)
+ #define MBEDTLS_BIGNUM_C
+ #define MBEDTLS_OID_C
+ #define MBEDTLS_PKCS1_V15
+-- 
+2.17.1
+

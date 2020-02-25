@@ -1,0 +1,29 @@
+From 6b071441e2cf2f28f15bb22ba5596b5fdb5a820f Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Tue, 26 Mar 2019 14:03:54 +0100
+Subject: [PATCH 32/36] ci: .shippable.yml: add build for mbedtls
+
+Adds shippable build configuration for using mbedtls as crypto library.
+
+Acked-by: Jerome Forissier <jerome.forissier@linaro.org>
+Tested-by: Jerome Forissier <jerome.forissier@linaro.org> (HiKey960, mbedtls, GP)
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ .shippable.yml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/.shippable.yml b/.shippable.yml
+index fd42b3a1..172c3702 100644
+--- a/.shippable.yml
++++ b/.shippable.yml
+@@ -31,6 +31,7 @@ build:
+     - _make CFG_CRYPTO_{G,C}CM=n
+     - _make CFG_CRYPTO_{MD5,SHA{1,224,256,384,512}}=n
+     - _make CFG_WITH_PAGER=y
++    - _make CFG_WITH_PAGER=y CFG_CRYPTOLIB_NAME=mbedtls CFG_CRYPTOLIB_DIR=lib/libmbedtls
+     - _make CFG_WITH_PAGER=y CFG_WITH_LPAE=y
+     - _make CFG_WITH_LPAE=y
+     - _make CFG_RPMB_FS=y
+-- 
+2.17.1
+

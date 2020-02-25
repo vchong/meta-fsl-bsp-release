@@ -1,0 +1,30 @@
+From 294745125957ea7f450c16355c58a732230de468 Mon Sep 17 00:00:00 2001
+From: Cyrille Fleury <cyrille.fleury@nxp.com>
+Date: Wed, 29 Jan 2020 12:14:06 +0100
+Subject: [PATCH 08/36] MMIOT-95: We should change the API of
+ tee_otp_get_hw_unique_key() to return error code!. Remove error check waiting
+ it is done.
+
+Signed-off-by: Cyrille Fleury <cyrille.fleury@nxp.com>
+---
+ core/kernel/huk_subkey.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/core/kernel/huk_subkey.c b/core/kernel/huk_subkey.c
+index 67027f39..0ec4a36d 100644
+--- a/core/kernel/huk_subkey.c
++++ b/core/kernel/huk_subkey.c
+@@ -73,9 +73,7 @@ TEE_Result huk_subkey_derive(enum huk_subkey_usage usage,
+ 	if (res)
+ 		return res;
+ 
+-	res = tee_otp_get_hw_unique_key(&huk);
+-	if (res)
+-		goto out;
++	tee_otp_get_hw_unique_key(&huk);
+ 
+ 	res = crypto_mac_init(ctx, TEE_ALG_HMAC_SHA256, huk.data,
+ 			      sizeof(huk.data));
+-- 
+2.17.1
+

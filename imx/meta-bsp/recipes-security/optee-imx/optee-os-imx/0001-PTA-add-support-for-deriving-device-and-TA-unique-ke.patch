@@ -1,0 +1,147 @@
+From 93f36bdb9adb4100c267c7ccd2aa170913deda29 Mon Sep 17 00:00:00 2001
+From: Joakim Bech <joakim.bech@linaro.org>
+Date: Wed, 29 May 2019 10:50:44 +0200
+Subject: [PATCH 01/36] PTA: add support for deriving device and TA unique keys
+
+Enable derivation of device and Trusted Application unique keys that can
+be used by different Trusted Applications directly. An example of use
+case could be when you need to encrypt some data in a Trusted App and
+then give it back to normal world.
+
+By default device unique properties (HUK and TA UUID) will be used when
+deriving a key. However, the one calling the PTA derive key function
+also have the ability to provide some extra data that will be mixed in
+together with existing device unique properties. That gives the ability
+to derive keys that are not only device and Trusted Application unique,
+but also tied to some additional data, it could for example be a
+password or something similar.
+
+Signed-off-by: Joakim Bech <joakim.bech@linaro.org>
+Reviewed-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ core/arch/arm/pta/system.c       | 54 ++++++++++++++++++++++++++++++++
+ lib/libutee/include/pta_system.h | 24 ++++++++++++++
+ 2 files changed, 78 insertions(+)
+
+diff --git a/core/arch/arm/pta/system.c b/core/arch/arm/pta/system.c
+index 1186407d..320b0e6f 100644
+--- a/core/arch/arm/pta/system.c
++++ b/core/arch/arm/pta/system.c
+@@ -2,6 +2,10 @@
+ /*
+  * Copyright (c) 2018, Linaro Limited
+  */
++/* Standard includes */
++#include <string.h>
++
++#include <kernel/huk_subkey.h>
+ #include <kernel/msg_param.h>
+ #include <kernel/pseudo_ta.h>
+ #include <kernel/user_ta.h>
+@@ -40,6 +44,52 @@ static TEE_Result system_rng_reseed(struct tee_ta_session *s __unused,
+ 	return TEE_SUCCESS;
+ }
+ 
++static TEE_Result system_derive_ta_unique_key(struct tee_ta_session *s,
++					      uint32_t param_types,
++					      TEE_Param params[TEE_NUM_PARAMS])
++{
++	size_t data_len = sizeof(TEE_UUID);
++	TEE_Result res = TEE_ERROR_GENERIC;
++	uint8_t *data = NULL;
++	uint32_t exp_pt = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
++					  TEE_PARAM_TYPE_MEMREF_OUTPUT,
++					  TEE_PARAM_TYPE_NONE,
++					  TEE_PARAM_TYPE_NONE);
++
++	if (exp_pt != param_types)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	if (params[0].memref.size > TA_DERIVED_EXTRA_DATA_MAX_SIZE ||
++	    params[1].memref.size < TA_DERIVED_KEY_MIN_SIZE ||
++	    params[1].memref.size > TA_DERIVED_KEY_MAX_SIZE)
++		return TEE_ERROR_BAD_PARAMETERS;
++
++	/* The derived key shall not end up in non-secure memory by mistake */
++	if (!tee_vbuf_is_sec(params[1].memref.buffer, params[1].memref.size))
++		return TEE_ERROR_SECURITY;
++
++	/* Take extra data into account. */
++	if (ADD_OVERFLOW(data_len, params[0].memref.size, &data_len))
++		return TEE_ERROR_SECURITY;
++
++	data = calloc(data_len, 1);
++	if (!data)
++		return TEE_ERROR_OUT_OF_MEMORY;
++
++	memcpy(data, &s->ctx->uuid, sizeof(TEE_UUID));
++
++	/* Append the user provided data */
++	memcpy(data + sizeof(TEE_UUID), params[0].memref.buffer,
++	       params[0].memref.size);
++
++	res = huk_subkey_derive(HUK_SUBKEY_UNIQUE_TA, data, data_len,
++				params[1].memref.buffer,
++				params[1].memref.size);
++	free(data);
++
++	return res;
++}
++
+ static TEE_Result open_session(uint32_t param_types __unused,
+ 			       TEE_Param params[TEE_NUM_PARAMS] __unused,
+ 			       void **sess_ctx __unused)
+@@ -65,6 +115,10 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
+ 	switch (cmd_id) {
+ 	case PTA_SYSTEM_ADD_RNG_ENTROPY:
+ 		return system_rng_reseed(s, param_types, params);
++
++	case PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY:
++		return system_derive_ta_unique_key(s, param_types, params);
++
+ 	default:
+ 		break;
+ 	}
+diff --git a/lib/libutee/include/pta_system.h b/lib/libutee/include/pta_system.h
+index 1aba1637..e4670091 100644
+--- a/lib/libutee/include/pta_system.h
++++ b/lib/libutee/include/pta_system.h
+@@ -13,6 +13,17 @@
+ #define PTA_SYSTEM_UUID { 0x3a2f8978, 0x5dc0, 0x11e8, { \
+ 			 0x9c, 0x2d, 0xfa, 0x7a, 0xe0, 0x1b, 0xbe, 0xbc } }
+ 
++/*
++ * Having keys with too few bits impose a potential security risk, hence set a
++ * lower bound of 128 bits.
++ */
++#define TA_DERIVED_KEY_MIN_SIZE		16
++
++/* Same value as max in huk_subkey_derive */
++#define TA_DERIVED_KEY_MAX_SIZE		32
++
++#define TA_DERIVED_EXTRA_DATA_MAX_SIZE	1024
++
+ /*
+  * Add (re-seed) caller-provided entropy to the RNG pool. Keymaster
+  * implementations need to securely mix the provided entropy into their pool,
+@@ -23,4 +34,17 @@
+  */
+ #define PTA_SYSTEM_ADD_RNG_ENTROPY	0
+ 
++/*
++ * Derives a device and TA unique key. The caller can also provide extra data
++ * that will be mixed together with existing device unique properties. If no
++ * extra data is provided, then the derived key will only use device unique
++ * properties and caller TA UUID.
++ *
++ * [in]  params[0].memref.buffer     Buffer for extra data
++ * [in]  params[0].memref.size       Size of extra data (max 1024 bytes)
++ * [out] params[1].memref.buffer     Buffer for the derived key
++ * [out] params[1].memref.size       Size of the derived key (16 to 32 bytes)
++ */
++#define PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY 1
++
+ #endif /* __PTA_SYSTEM_H */
+-- 
+2.17.1
+

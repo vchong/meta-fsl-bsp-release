@@ -1,0 +1,31 @@
+From 8347404782f39947302cbc7efe926c78eba41af5 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Wed, 27 Mar 2019 19:13:35 +0100
+Subject: [PATCH 30/36] libmbedtls: Support cipher XTS algorithm
+
+Cipher XTS is not supported in MbedTLS, use libtomcrypt instead.
+
+Acked-by: Jerome Forissier <jerome.forissier@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/stubbed.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+index 5f1dec1e..30ff8f2f 100644
+--- a/lib/libmbedtls/core/stubbed.c
++++ b/lib/libmbedtls/core/stubbed.c
+@@ -26,10 +26,6 @@
+ 	crypto_##name##_alloc_ctx(struct crypto_##type##_ctx **ctx __unused) \
+ 	{ return TEE_ERROR_NOT_IMPLEMENTED; }
+ 
+-#if defined(CFG_CRYPTO_AES) && defined(CFG_CRYPTO_XTS)
+-CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_xts, cipher)
+-#endif
+-
+ #if defined(CFG_CRYPTO_CCM)
+ CRYPTO_ALLOC_CTX_NOT_IMPLEMENTED(aes_ccm, authenc)
+ #endif
+-- 
+2.17.1
+

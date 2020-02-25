@@ -1,0 +1,133 @@
+From 7cb468bfd22b761ff571ed9a235bac8a9b120965 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Thu, 25 Apr 2019 15:59:17 +0200
+Subject: [PATCH 04/36] core: introduce CFG_CORE_HUK_SUBKEY_COMPAT
+
+Adds CFG_CORE_HUK_SUBKEY_COMPAT which if set to 'y' makes
+huk_subkey_derive() produce RPMB and SSK keys identical to the legacy
+code.
+
+Reviewed-by: Joakim Bech <joakim.bech@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ core/kernel/huk_subkey.c | 47 ++++++++++++++++++++++++++++++++++++++++
+ mk/config.mk             | 33 ++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
+
+diff --git a/core/kernel/huk_subkey.c b/core/kernel/huk_subkey.c
+index 7d6e5bf4..67027f39 100644
+--- a/core/kernel/huk_subkey.c
++++ b/core/kernel/huk_subkey.c
+@@ -6,6 +6,7 @@
+ #include <crypto/crypto.h>
+ #include <kernel/huk_subkey.h>
+ #include <kernel/tee_common_otp.h>
++#include <tee/tee_fs_key_manager.h>
+ 
+ static TEE_Result mac_usage(void *ctx, uint32_t usage)
+ {
+@@ -13,6 +14,48 @@ static TEE_Result mac_usage(void *ctx, uint32_t usage)
+ 				 (const void *)&usage, sizeof(usage));
+ }
+ 
++#ifdef CFG_CORE_HUK_SUBKEY_COMPAT
++/*
++ * This gives the result of the default tee_otp_get_die_id()
++ * implementation.
++ */
++static void get_dummy_die_id(uint8_t *buffer, size_t len)
++{
++	static const char pattern[4] = { 'B', 'E', 'E', 'F' };
++	size_t i;
++
++	for (i = 0; i < len; i++)
++		buffer[i] = pattern[i % 4];
++}
++
++/*
++ * This does special treatment for RPMB and SSK key derivations to give
++ * the same result as when huk_subkey_derive() wasn't used.
++ */
++static TEE_Result huk_compat(void *ctx, enum huk_subkey_usage usage)
++{
++	TEE_Result res = TEE_SUCCESS;
++	uint8_t chip_id[TEE_FS_KM_CHIP_ID_LENGTH] = { 0 };
++	static uint8_t ssk_str[] = "ONLY_FOR_tee_fs_ssk";
++
++	switch (usage) {
++	case HUK_SUBKEY_RPMB:
++		return TEE_SUCCESS;
++	case HUK_SUBKEY_SSK:
++		get_dummy_die_id(chip_id, sizeof(chip_id));
++		res = crypto_mac_update(ctx, TEE_ALG_HMAC_SHA256,
++					chip_id, sizeof(chip_id));
++		if (res)
++			return res;
++		return crypto_mac_update(ctx, TEE_ALG_HMAC_SHA256,
++					 ssk_str, sizeof(ssk_str));
++	default:
++		return mac_usage(ctx, usage);
++	}
++
++}
++#endif /*CFG_CORE_HUK_SUBKEY_COMPAT*/
++
+ TEE_Result huk_subkey_derive(enum huk_subkey_usage usage,
+ 			     const void *const_data, size_t const_data_len,
+ 			     uint8_t *subkey, size_t subkey_len)
+@@ -39,7 +82,11 @@ TEE_Result huk_subkey_derive(enum huk_subkey_usage usage,
+ 	if (res)
+ 		goto out;
+ 
++#ifdef CFG_CORE_HUK_SUBKEY_COMPAT
++	res = huk_compat(ctx, usage);
++#else
+ 	res = mac_usage(ctx, usage);
++#endif
+ 	if (res)
+ 		goto out;
+ 
+diff --git a/mk/config.mk b/mk/config.mk
+index 33b832cc..0bf144da 100644
+--- a/mk/config.mk
++++ b/mk/config.mk
+@@ -326,3 +326,36 @@ CFG_TA_MBEDTLS ?= y
+ # Compile the TA library mbedTLS with self test functions, the functions
+ # need to be called to test anything
+ CFG_TA_MBEDTLS_SELF_TEST ?= y
++
++# By default use tomcrypt as the main crypto lib providing an implementation
++# for the API in <crypto/crypto.h>
++# CFG_CRYPTOLIB_NAME is used as libname and
++# CFG_CRYPTOLIB_DIR is used as libdir when compiling the library
++#
++# It's also possible to configure to use mbedtls instead of tomcrypt.
++# Then the variables should be assigned as "CFG_CRYPTOLIB_NAME=mbedtls" and
++# "CFG_CRYPTOLIB_DIR=lib/libmbedtls" respectively.
++CFG_CRYPTOLIB_NAME ?= tomcrypt
++CFG_CRYPTOLIB_DIR ?= core/lib/libtomcrypt
++
++# Enable TEE_ALG_RSASSA_PKCS1_V1_5 algorithm for signing with PKCS#1 v1.5 EMSA
++# without ASN.1 around the hash.
++ifeq ($(CFG_CRYPTOLIB_NAME),tomcrypt)
++CFG_CRYPTO_RSASSA_NA1 ?= y
++CFG_CORE_MBEDTLS_MPI ?= y
++endif
++
++# Enable virtualization support. OP-TEE will not work without compatible
++# hypervisor if this option is enabled.
++CFG_VIRTUALIZATION ?= n
++
++ifeq ($(CFG_VIRTUALIZATION),y)
++$(call force,CFG_CORE_RODATA_NOEXEC,y)
++$(call force,CFG_CORE_RWDATA_NOEXEC,y)
++
++# Default number of virtual guests
++CFG_VIRT_GUEST_COUNT ?= 2
++endif
++
++# Enables backwards compatible derivation of RPMB and SSK keys
++CFG_CORE_HUK_SUBKEY_COMPAT ?= y
+-- 
+2.17.1
+

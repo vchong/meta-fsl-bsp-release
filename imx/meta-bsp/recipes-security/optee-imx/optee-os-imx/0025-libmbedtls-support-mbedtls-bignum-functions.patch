@@ -1,0 +1,219 @@
+From 61011c3fabf8e06b983501a883749dfa7834d4fe Mon Sep 17 00:00:00 2001
+From: Edison Ai <edison.ai@arm.com>
+Date: Thu, 14 Sep 2017 14:17:40 +0800
+Subject: [PATCH 25/36] libmbedtls: support mbedtls bignum functions
+
+Implement bignum function based on mbedtls.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Edison Ai <edison.ai@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/core/bignum.c                  | 101 ++++++++++++++++++
+ lib/libmbedtls/core/stubbed.c                 |  53 ---------
+ lib/libmbedtls/core/sub.mk                    |   3 +
+ .../include/mbedtls_config_kernel.h           |   5 +
+ 4 files changed, 109 insertions(+), 53 deletions(-)
+ create mode 100644 lib/libmbedtls/core/bignum.c
+
+diff --git a/lib/libmbedtls/core/bignum.c b/lib/libmbedtls/core/bignum.c
+new file mode 100644
+index 00000000..61f6c5c6
+--- /dev/null
++++ b/lib/libmbedtls/core/bignum.c
+@@ -0,0 +1,101 @@
++// SPDX-License-Identifier: BSD-2-Clause
++/*
++ * Copyright (C) 2018, ARM Limited
++ * Copyright (C) 2019, Linaro Limited
++ */
++
++#include <assert.h>
++#include <crypto/crypto.h>
++#include <kernel/panic.h>
++#include <mbedtls/bignum.h>
++#include <stdlib.h>
++#include <string.h>
++#include <util.h>
++
++#define ciL		(sizeof(mbedtls_mpi_uint))	/* chars in limb  */
++#define biL		(ciL << 3)			/* bits  in limb  */
++#define BITS_TO_LIMBS(i) ((i) / biL + ((i) % biL != 0))
++
++size_t crypto_bignum_num_bytes(struct bignum *a)
++{
++	assert(a != NULL);
++	return mbedtls_mpi_size((const mbedtls_mpi *)a);
++}
++
++size_t crypto_bignum_num_bits(struct bignum *a)
++{
++	assert(a != NULL);
++	return mbedtls_mpi_bitlen((const mbedtls_mpi *)a);
++}
++
++int32_t crypto_bignum_compare(struct bignum *a, struct bignum *b)
++{
++	int ret = 0;
++
++	assert(a != NULL);
++	assert(b != NULL);
++	ret = mbedtls_mpi_cmp_mpi((const mbedtls_mpi *)a,
++				  (const mbedtls_mpi *)b);
++	return CMP_TRILEAN(ret, 0);
++}
++
++void crypto_bignum_bn2bin(const struct bignum *from, uint8_t *to)
++{
++	size_t len = 0;
++
++	assert(from != NULL);
++	assert(to != NULL);
++	len = crypto_bignum_num_bytes((struct bignum *)from);
++	if (mbedtls_mpi_write_binary((mbedtls_mpi *)from, to, len))
++		panic();
++}
++
++TEE_Result crypto_bignum_bin2bn(const uint8_t *from, size_t fromsize,
++			 struct bignum *to)
++{
++	assert(from != NULL);
++	assert(to != NULL);
++	if (mbedtls_mpi_read_binary((mbedtls_mpi *)to, from, fromsize))
++		return TEE_ERROR_BAD_PARAMETERS;
++	return TEE_SUCCESS;
++}
++
++void crypto_bignum_copy(struct bignum *to, const struct bignum *from)
++{
++	assert(from != NULL);
++	assert(to != NULL);
++	if (mbedtls_mpi_copy((mbedtls_mpi *)to, (const mbedtls_mpi *)from))
++		panic();
++}
++
++struct bignum *crypto_bignum_allocate(size_t size_bits)
++{
++	mbedtls_mpi *bn = NULL;
++
++	if (size_bits > CFG_CORE_BIGNUM_MAX_BITS)
++		size_bits = CFG_CORE_BIGNUM_MAX_BITS;
++
++	bn = calloc(1, sizeof(mbedtls_mpi));
++	if (!bn)
++		return NULL;
++	mbedtls_mpi_init(bn);
++	if (mbedtls_mpi_grow(bn, BITS_TO_LIMBS(size_bits)) != 0) {
++		free(bn);
++		return NULL;
++	}
++
++	return (struct bignum *)bn;
++}
++
++void crypto_bignum_free(struct bignum *s)
++{
++	mbedtls_mpi_free((mbedtls_mpi *)s);
++	free(s);
++}
++
++void crypto_bignum_clear(struct bignum *s)
++{
++	mbedtls_mpi *bn = (mbedtls_mpi *)s;
++
++	memset(bn->p, 0, mbedtls_mpi_size((const mbedtls_mpi *)bn));
++}
+diff --git a/lib/libmbedtls/core/stubbed.c b/lib/libmbedtls/core/stubbed.c
+index 0cc6bc3c..b7e393cd 100644
+--- a/lib/libmbedtls/core/stubbed.c
++++ b/lib/libmbedtls/core/stubbed.c
+@@ -15,59 +15,6 @@
+  * Asymmetric algorithms
+  ******************************************************************************/
+ 
+-#if defined(CFG_CRYPTO_RSA) || defined(CFG_CRYPTO_DSA) || \
+-    defined(CFG_CRYPTO_DH) || defined(CFG_CRYPTO_ECC)
+-struct bignum *crypto_bignum_allocate(size_t size_bits __unused)
+-{
+-	return NULL;
+-}
+-
+-TEE_Result crypto_bignum_bin2bn(const uint8_t *from __unused,
+-				size_t fromsize __unused,
+-				struct bignum *to __unused)
+-{
+-	return TEE_ERROR_NOT_IMPLEMENTED;
+-}
+-
+-size_t crypto_bignum_num_bytes(struct bignum *a __unused)
+-{
+-	return 0;
+-}
+-
+-size_t crypto_bignum_num_bits(struct bignum *a __unused)
+-{
+-	return 0;
+-}
+-
+-void crypto_bignum_bn2bin(const struct bignum *from __unused,
+-			  uint8_t *to __unused)
+-{
+-}
+-
+-void crypto_bignum_copy(struct bignum *to __unused,
+-			const struct bignum *from __unused)
+-{
+-}
+-
+-void crypto_bignum_free(struct bignum *a)
+-{
+-	if (a)
+-		panic();
+-}
+-
+-void crypto_bignum_clear(struct bignum *a __unused)
+-{
+-}
+-
+-/* return -1 if a<b, 0 if a==b, +1 if a>b */
+-int32_t crypto_bignum_compare(struct bignum *a __unused,
+-			      struct bignum *b __unused)
+-{
+-	return -1;
+-}
+-#endif
+-
+-
+ #if defined(CFG_CRYPTO_RSA)
+ TEE_Result crypto_acipher_alloc_rsa_keypair(struct rsa_keypair *s __unused,
+ 					    size_t key_size_bits __unused)
+diff --git a/lib/libmbedtls/core/sub.mk b/lib/libmbedtls/core/sub.mk
+index cf65453d..2cc79bd6 100644
+--- a/lib/libmbedtls/core/sub.mk
++++ b/lib/libmbedtls/core/sub.mk
+@@ -21,3 +21,6 @@ endif
+ 
+ srcs-$(CFG_CRYPTO_HMAC) += hmac.c
+ srcs-$(CFG_CRYPTO_CMAC) += aes_cmac.c
++
++srcs-$(call cfg-one-enabled, CFG_CRYPTO_RSA CFG_CRYPTO_DSA \
++			     CFG_CRYPTO_DH CFG_CRYPTO_ECC) += bignum.c
+diff --git a/lib/libmbedtls/include/mbedtls_config_kernel.h b/lib/libmbedtls/include/mbedtls_config_kernel.h
+index bb7b3787..7a803d61 100644
+--- a/lib/libmbedtls/include/mbedtls_config_kernel.h
++++ b/lib/libmbedtls/include/mbedtls_config_kernel.h
+@@ -63,6 +63,11 @@
+ #define MBEDTLS_CIPHER_C
+ #endif
+ 
++#if defined(CFG_CRYPTO_RSA) || defined(CFG_CRYPTO_DSA) || \
++    defined(CFG_CRYPTO_DH) || defined(CFG_CRYPTO_ECC)
++#define MBEDTLS_BIGNUM_C
++#endif
++
+ #endif /*CFG_CRYPTOLIB_NAME_mbedtls*/
+ 
+ #include <mbedtls/check_config.h>
+-- 
+2.17.1
+

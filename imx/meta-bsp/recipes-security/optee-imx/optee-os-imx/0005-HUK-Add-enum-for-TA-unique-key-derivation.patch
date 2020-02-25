@@ -1,0 +1,43 @@
+From 1fdc69e923fa28ad3d84a97b4f3f476a530e35d1 Mon Sep 17 00:00:00 2001
+From: Joakim Bech <joakim.bech@linaro.org>
+Date: Wed, 29 May 2019 15:51:26 +0200
+Subject: [PATCH 05/36] HUK: Add enum for TA unique key derivation
+
+Add an additional enum that will be used when deriving device and TA
+unique keys.
+
+Signed-off-by: Joakim Bech <joakim.bech@linaro.org>
+Reviewed-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ core/include/kernel/huk_subkey.h | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/core/include/kernel/huk_subkey.h b/core/include/kernel/huk_subkey.h
+index 589c1d2a..364cf3c8 100644
+--- a/core/include/kernel/huk_subkey.h
++++ b/core/include/kernel/huk_subkey.h
+@@ -12,9 +12,10 @@
+ 
+ /*
+  * enum huk_subkey_usage - subkey usage identifier
+- * @HUK_SUBKEY_RPMB:	RPMB key
+- * @HUK_SUBKEY_SSK:	Secure Storage key
+- * @HUK_SUBKEY_DIE_ID:	Representing the die ID
++ * @HUK_SUBKEY_RPMB:	  RPMB key
++ * @HUK_SUBKEY_SSK:	  Secure Storage key
++ * @HUK_SUBKEY_DIE_ID:	  Representing the die ID
++ * @HUK_SUBKEY_UNIQUE_TA: TA unique key
+  *
+  * Add more identifiers as needed, be careful to not change the already
+  * assigned numbers as that will affect the derived subkey.
+@@ -27,6 +28,7 @@ enum huk_subkey_usage {
+ 	HUK_SUBKEY_RPMB = 0,
+ 	HUK_SUBKEY_SSK = 1,
+ 	HUK_SUBKEY_DIE_ID = 2,
++	HUK_SUBKEY_UNIQUE_TA = 3,
+ };
+ 
+ #define HUK_SUBKEY_MAX_LEN	TEE_SHA256_HASH_SIZE
+-- 
+2.17.1
+

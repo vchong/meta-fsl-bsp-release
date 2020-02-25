@@ -1,0 +1,36 @@
+From a63b635af833fc72e519d595cd2071373f5a898e Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Wed, 17 Apr 2019 12:28:43 +0200
+Subject: [PATCH 34/36] libmbedtls: preserve mempool usage on reinit
+
+be040a3e949b  ("libmbedtls: preserve mempool usage on reinit") from
+branch import/mbedtls-2.16.0
+
+Preserve the use_mempool field when reinitializing X in
+mbedtls_mpi_read_binary().
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/mbedtls/library/bignum.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/lib/libmbedtls/mbedtls/library/bignum.c b/lib/libmbedtls/mbedtls/library/bignum.c
+index 5d4beca4..8279d7d6 100644
+--- a/lib/libmbedtls/mbedtls/library/bignum.c
++++ b/lib/libmbedtls/mbedtls/library/bignum.c
+@@ -777,8 +777,10 @@ int mbedtls_mpi_read_binary( mbedtls_mpi *X, const unsigned char *buf, size_t bu
+     /* Ensure that target MPI has exactly the necessary number of limbs */
+     if( X->n != limbs )
+     {
++        short use_mempool = X->use_mempool;
++
+         mbedtls_mpi_free( X );
+-        mbedtls_mpi_init( X );
++        mpi_init( X, use_mempool );
+         MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, limbs ) );
+     }
+ 
+-- 
+2.17.1
+

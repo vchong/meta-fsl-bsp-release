@@ -1,0 +1,62 @@
+From e53db6963472000d5658c80669c7354135720941 Mon Sep 17 00:00:00 2001
+From: Summer Qin <summer.qin@arm.com>
+Date: Fri, 15 Dec 2017 11:27:56 +0800
+Subject: [PATCH 18/36] libmbedtls: fix no CRT issue
+
+b95a6c5de200 ("libmbedtls: fix no CRT issue") from branch
+import/mbedtls-2.16.0
+
+In NO_CRT mode, Q and P may be invalid. But Q and P will be re-filled
+again if PRNG function is valid. So add judgement process if it is
+in NO_CRT mode.
+
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Summer Qin <summer.qin@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ lib/libmbedtls/mbedtls/library/rsa.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/lib/libmbedtls/mbedtls/library/rsa.c b/lib/libmbedtls/mbedtls/library/rsa.c
+index 4ee7565c..a8ec4852 100644
+--- a/lib/libmbedtls/mbedtls/library/rsa.c
++++ b/lib/libmbedtls/mbedtls/library/rsa.c
+@@ -1361,9 +1361,14 @@ int mbedtls_rsa_rsaes_oaep_decrypt( mbedtls_rsa_context *ctx,
+     /*
+      * RSA operation
+      */
+-    ret = ( mode == MBEDTLS_RSA_PUBLIC )
+-          ? mbedtls_rsa_public(  ctx, input, buf )
+-          : mbedtls_rsa_private( ctx, f_rng, p_rng, input, buf );
++    if( ctx->P.n == 0 )
++        ret = ( mode == MBEDTLS_RSA_PUBLIC )
++              ? mbedtls_rsa_public(  ctx, input, buf )
++              : mbedtls_rsa_private( ctx, NULL, NULL, input, buf );
++    else
++        ret = ( mode == MBEDTLS_RSA_PUBLIC )
++              ? mbedtls_rsa_public(  ctx, input, buf )
++              : mbedtls_rsa_private( ctx, f_rng, p_rng, input, buf );
+ 
+     if( ret != 0 )
+         goto cleanup;
+@@ -1867,9 +1872,14 @@ exit:
+     if( ret != 0 )
+         return( ret );
+ 
+-    return( ( mode == MBEDTLS_RSA_PUBLIC )
+-            ? mbedtls_rsa_public(  ctx, sig, sig )
+-            : mbedtls_rsa_private( ctx, f_rng, p_rng, sig, sig ) );
++    if( ctx->P.n == 0)
++        return( ( mode == MBEDTLS_RSA_PUBLIC )
++                ? mbedtls_rsa_public(  ctx, sig, sig )
++                : mbedtls_rsa_private( ctx, NULL, NULL, sig, sig ) );
++    else
++        return( ( mode == MBEDTLS_RSA_PUBLIC )
++                ? mbedtls_rsa_public(  ctx, sig, sig )
++                : mbedtls_rsa_private( ctx, f_rng, p_rng, sig, sig ) );
+ }
+ #endif /* MBEDTLS_PKCS1_V21 */
+ 
+-- 
+2.17.1
+
