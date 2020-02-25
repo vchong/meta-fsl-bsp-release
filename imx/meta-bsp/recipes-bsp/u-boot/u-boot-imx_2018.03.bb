@@ -14,7 +14,8 @@ LIC_FILES_CHKSUM = "file://Licenses/gpl-2.0.txt;md5=b234ee4d69f5fce4486a80fdaf4a
 UBOOT_SRC ?= "git://source.codeaurora.org/external/imx/uboot-imx.git;protocol=https"
 SRCBRANCH = "imx_v2018.03_4.14.98_2.1.0"
 SRC_URI = "${UBOOT_SRC};branch=${SRCBRANCH}"
-#DRM_PATCH
+
+SRC_URI += "file://0001-Use-a-customize-device-tree-configuration-for-DRM.patch" 
 SRCREV = "b9dc0acc7a29fc56012c7c2ebfff36a7ff3320ab"
 
 S = "${WORKDIR}/git"
