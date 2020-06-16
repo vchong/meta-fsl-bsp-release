@@ -1,0 +1,44 @@
+From e5ea4ae411d927e1a5cc3d2f09fe2e5e376766ca Mon Sep 17 00:00:00 2001
+From: "faqiang.zhu" <faqiang.zhu@nxp.com>
+Date: Tue, 9 Jul 2019 18:52:12 +0800
+Subject: [PATCH 21/31] MA-14916-10 fix fastboot reboot bootloader issue
+
+In Android, the reboot bootloader flag is written to misc partition, in
+the boot flow, u-boot will check that message to decide whether enter
+fastboot mode or not. To be compatible with the common implemention,
+keep the fastboot_set_reboot_flag there and redefine it to avoid the
+error return value which block the reboot process.
+
+Change-Id: Ifb55236d5a5daf3edd124d3ed01851ff6e916e1a
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ drivers/fastboot/fb_fsl/fb_fsl_command.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+index 5da84cf..fbbcbe9 100755
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -722,6 +722,19 @@ static void erase(char *cmd, char *response)
+ }
+ #endif
+ 
++/**
++ * fastboot_set_reboot_flag() - Set flag to indicate reboot-bootloader
++ *
++ * This is a redefinition, since BSP dose not need the function of
++ * "reboot into bootloader", and with BCB support, the flag can be
++ * set with another way. Redefine this function to override the weak
++ * definition to avoid error return value.
++ */
++int fastboot_set_reboot_flag(void)
++{
++	return 0;
++}
++
+ #if CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
+ /**
+  * run_ucmd() - Execute the UCmd command
+-- 
+2.7.4
+

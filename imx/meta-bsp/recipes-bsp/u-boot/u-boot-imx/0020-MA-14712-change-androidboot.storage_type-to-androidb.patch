@@ -1,0 +1,37 @@
+From 5dc13cdc70182d48956845a06a1e8e9d945787b7 Mon Sep 17 00:00:00 2001
+From: Jindong <jindong.yue@nxp.com>
+Date: Mon, 13 May 2019 18:10:25 +0800
+Subject: [PATCH 20/31] MA-14712 change androidboot.storage_type to
+ androidboot.boot_device_root
+
+storage_type is emmc or sd, which is not friendly
+for user space, for example android health HAL need access
+/sys/block/mmcblkX/stat.
+
+Replace it with mmcblkX named as boot_device_root.
+(Keep storage_type for compatibility now)
+
+Change-Id: I7486d522696e9fe3dde8bdc8834ac11d25df7d79
+Signed-off-by: Jindong <jindong.yue@nxp.com>
+---
+ common/image-android.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/common/image-android.c b/common/image-android.c
+index 98d4e14..20b4672 100644
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@ -146,6 +146,10 @@ int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
+ 		strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+ 	}
+ 
++	sprintf(newbootargs,
++			" androidboot.boot_device_root=mmcblk%d", mmc_map_to_kernel_blk(mmc_get_env_dev()));
++	strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
++
+ 	char *storage_type = env_get("storage_type");
+ 	if (storage_type) {
+ 		sprintf(newbootargs,
+-- 
+2.7.4
+

@@ -1,0 +1,43 @@
+From b0cd036687a2d7dfcf2462a43c7f26984d7f0222 Mon Sep 17 00:00:00 2001
+From: Breno Lima <breno.lima@nxp.com>
+Date: Tue, 27 Aug 2019 08:39:15 -0300
+Subject: [PATCH 27/31] MLK-22513 doc: ahab: Update OS container image target
+
+Commit 28dd37699022("imx8: Clean up targets") in imx-mkimage project
+renamed flash_linux target to flash_kernel.
+
+Update AHAB documentation to align with this change.
+
+Reported-by: Frank Zhang <frank.zhang@nxp.com>
+Reviewed-by: Ye Li <ye.li@nxp.com>
+Signed-off-by: Breno Lima <breno.lima@nxp.com>
+(cherry picked from commit 8713142afd953e89bb6aa460716692fbb0a6a413)
+---
+ doc/imx/ahab/guides/mx8_mx8x_secure_boot.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/doc/imx/ahab/guides/mx8_mx8x_secure_boot.txt b/doc/imx/ahab/guides/mx8_mx8x_secure_boot.txt
+index ed2346a..591a6c3 100644
+--- a/doc/imx/ahab/guides/mx8_mx8x_secure_boot.txt
++++ b/doc/imx/ahab/guides/mx8_mx8x_secure_boot.txt
+@@ -325,7 +325,7 @@ generated to the <work> directory to save it for later:
+ 
+   $ cd <work>/imx-mkimage
+   $ cp iMX8QX/flash.bin ..
+-  $ make SOC=iMX8QX flash_linux
++  $ make SOC=iMX8QX flash_kernel
+   $ mv iMX8QX/flash.bin iMX8QX/flash_os.bin
+   $ cp iMX8QX/flash_os.bin ..
+ 
+@@ -333,7 +333,7 @@ generated to the <work> directory to save it for later:
+ 
+     $ cd <work>/imx-mkimage
+     $ cp iMX8QM/flash.bin ..
+-    $ make SOC=iMX8QM flash_linux
++    $ make SOC=iMX8QM flash_kernel
+     $ mv iMX8QM/flash.bin iMX8QM/flash_os.bin
+     $ cp iMX8QM/flash_os.bin ..
+ 
+-- 
+2.7.4
+

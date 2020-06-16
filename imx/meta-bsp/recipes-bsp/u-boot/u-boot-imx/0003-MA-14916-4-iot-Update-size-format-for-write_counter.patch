@@ -1,0 +1,45 @@
+From 921a320f99bb20371c72e4abfd1e377f2dd4d265 Mon Sep 17 00:00:00 2001
+From: Luo Ji <ji.luo@nxp.com>
+Date: Thu, 21 Jun 2018 09:34:41 +0800
+Subject: [PATCH 03/31] MA-14916-4 [iot] Update size format for write_counter
+
+This commit is cherry-picked from community:
+	commit 343749c42554b058e53086aefe21d47b383326d5
+	author Kever Yang <kever.yang@rock-chips.com>
+	date Wed, 19 Jul 2017 18:13:59 +0800 (19:13 +0900)
+
+	mmc: rpmb: update size format for write_counter
+
+	According to MMC spec, the write_counter is 4-byte length,
+	use 'int' instead of 'long' type for the 'long' is not 4-byte
+	in 64 bit CPU.
+
+	Signed-off-by: Jason Zhu <jason.zhu@rock-chips.com>
+	Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+	Reviewed-by: Simon Glass <sjg@chromium.org>
+	Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+
+Test: Access RPMB successfully on imx8m.
+
+Change-Id: I402b53c990856c2cdf7c3686eabf259f5581464d
+Signed-off-by: Luo Ji <ji.luo@nxp.com>
+---
+ include/mmc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/mmc.h b/include/mmc.h
+index 2a10905..6aa2bad 100644
+--- a/include/mmc.h
++++ b/include/mmc.h
+@@ -786,7 +786,7 @@ struct s_rpmb {
+ 	unsigned char mac[RPMB_SZ_MAC];
+ 	unsigned char data[RPMB_SZ_DATA];
+ 	unsigned char nonce[RPMB_SZ_NONCE];
+-	unsigned long write_counter;
++	unsigned int write_counter;
+ 	unsigned short address;
+ 	unsigned short block_count;
+ 	unsigned short result;
+-- 
+2.7.4
+

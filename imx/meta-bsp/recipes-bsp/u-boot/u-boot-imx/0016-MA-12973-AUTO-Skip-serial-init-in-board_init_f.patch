@@ -1,0 +1,37 @@
+From 8505ab882e0cf69150b730a2f69a2ddf96d363eb Mon Sep 17 00:00:00 2001
+From: Ji Luo <ji.luo@nxp.com>
+Date: Sun, 30 Sep 2018 15:24:09 +0800
+Subject: [PATCH 16/31] MA-12973 [AUTO] Skip serial init in board_init_f
+
+Serial init in board_init_f will cost much time, skip it here
+because the serial will be initialized again in board_init_r
+and it's more faster (after cache is enabled). We will miss
+some logs before the serial is ready but it's ok for Android Auto.
+This commit will save about 190ms on imx8qm.
+
+Test: boot ok for both imx8qm and imx8qxp.
+
+Change-Id: If6efdc19794aecda862f22b6fec7f7aba2005766
+Signed-off-by: Ji Luo <ji.luo@nxp.com>
+Reviewed-by: Ye Li <ye.li@nxp.com>
+---
+ common/board_f.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/common/board_f.c b/common/board_f.c
+index a45fbf7..6c806ea 100644
+--- a/common/board_f.c
++++ b/common/board_f.c
+@@ -872,7 +872,9 @@ static const init_fnc_t init_sequence_f[] = {
+ #endif
+ 	env_init,		/* initialize environment */
+ 	init_baud_rate,		/* initialze baudrate settings */
++#ifndef CONFIG_ANDROID_AUTO_SUPPORT
+ 	serial_init,		/* serial communications setup */
++#endif
+ 	console_init_f,		/* stage 1 init of console */
+ 	display_options,	/* say that we are here */
+ 	display_text_info,	/* show debugging info if required */
+-- 
+2.7.4
+

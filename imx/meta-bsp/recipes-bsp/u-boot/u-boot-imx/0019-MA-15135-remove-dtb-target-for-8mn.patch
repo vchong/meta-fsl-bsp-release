@@ -1,0 +1,30 @@
+From 14fc5b918c83a69d35097bb5b5c284feb5d66ee2 Mon Sep 17 00:00:00 2001
+From: "faqiang.zhu" <faqiang.zhu@nxp.com>
+Date: Mon, 15 Jul 2019 14:53:58 +0800
+Subject: [PATCH 19/31] MA-15135 remove dtb target for 8mn
+
+on this imx_v2019.04_4.19.35_1.0.0 branch, 8mn_evk is not supported.
+the removed dtb target for imx8mn does not have corresponding dts file.
+
+Change-Id: I232fad1003670c20c96d3cde1627657d9c0db42d
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ arch/arm/dts/Makefile | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+index 7c5b9f7..fe6f6da 100644
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -632,8 +632,6 @@ dtb-$(CONFIG_ARCH_IMX8M) += fsl-imx8mq-evk.dtb \
+ 		fsl-imx8mm-ddr3l-val.dtb \
+ 		fsl-imx8mm-ddr4-evk.dtb \
+ 		fsl-imx8mm-ddr4-val.dtb \
+-		fsl-imx8mm-evk.dtb \
+-		fsl-imx8mn-ddr4-evk.dtb \
+ 		fsl-imx8mq-aiy.dtb
+ 
+ dtb-$(CONFIG_RCAR_GEN2) += \
+-- 
+2.7.4
+

@@ -1,0 +1,62 @@
+From adc1b058123025b01ccbe4a2ecbe77c77913fcad Mon Sep 17 00:00:00 2001
+From: Peng Fan <peng.fan@nxp.com>
+Date: Thu, 15 Nov 2018 13:13:14 +0800
+Subject: [PATCH 12/31] MLK-20373-2 dm: serial: introduce puts hook
+
+Introduce puts hook for dm serial driver.
+
+Change-Id: I75423998c7d8db20949bae6ac46a094dc62c9612
+Signed-off-by: Peng Fan <peng.fan@nxp.com>
+Reviewed-by: Peng Fan <peng.fan@nxp.com>
+Reviewed-by: Flynn xu <flynn.xu@nxp.com>
+---
+ drivers/serial/serial-uclass.c | 13 +++++++++++--
+ include/serial.h               |  8 ++++++++
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/serial/serial-uclass.c b/drivers/serial/serial-uclass.c
+index d4488a2..9707589 100644
+--- a/drivers/serial/serial-uclass.c
++++ b/drivers/serial/serial-uclass.c
+@@ -185,8 +185,17 @@ static void _serial_putc(struct udevice *dev, char ch)
+ 
+ static void _serial_puts(struct udevice *dev, const char *str)
+ {
+-	while (*str)
+-		_serial_putc(dev, *str++);
++	struct dm_serial_ops *ops = serial_get_ops(dev);
++	int err;
++
++	if (ops->puts) {
++		do {
++			err = ops->puts(dev, str);
++		} while (err == -EAGAIN);
++	} else {
++		while (*str)
++			_serial_putc(dev, *str++);
++	}
+ }
+ 
+ static int __serial_getc(struct udevice *dev)
+diff --git a/include/serial.h b/include/serial.h
+index c1368c6..a8d4a67 100644
+--- a/include/serial.h
++++ b/include/serial.h
+@@ -182,6 +182,14 @@ struct dm_serial_ops {
+ 	 */
+ 	int (*getc)(struct udevice *dev);
+ 	/**
++	 * puts() - puts a string
++	 *
++	 * @dev: Device pointer
++	 * @str: string to write
++	 * @return 0 if OK, -ve on error
++	 */
++	int (*puts)(struct udevice *dev, const char *str);
++	/**
+ 	 * putc() - Write a character
+ 	 *
+ 	 * @dev: Device pointer
+-- 
+2.7.4
+

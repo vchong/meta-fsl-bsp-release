@@ -1,0 +1,485 @@
+From 51cdaae1c49fc0b5e9c62969def74bc16c6d2723 Mon Sep 17 00:00:00 2001
+From: "faqiang.zhu" <faqiang.zhu@nxp.com>
+Date: Wed, 5 Jun 2019 19:52:48 +0800
+Subject: [PATCH 02/31] MA-14916 fix build and function issues of fastboot for
+ Android
+
+to fix build issues, add two header files, "fastboot_lock_unlock.h" is
+copied from imx_v2018.03 branch, "fb_fsl_common.h" contains some
+varialbes and a function used in more than one files.
+
+the places where "fastboot_lock_unlock.h" is included is modified to
+adapt to this change.
+"fsl_fastboot.h" is renamed to "fb_fsl.h", the places where
+"fsl_fastboot.h" is included is modified to adapt to this change.
+
+to fix function issues, command handle function in "fb_fsl_command.c" is
+modified.
+
+build based on imx8mm_ddr4_evk, the board can boot and basic fastboot
+function can work.
+
+Change-Id: I34961ef70351a1ee4c84b6721dba5ac7b261a0d3
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ drivers/fastboot/fb_fsl/fastboot_lock_unlock.h |  74 ++++++++++++++++
+ drivers/fastboot/fb_fsl/fb_fsl_boot.c          |   3 +-
+ drivers/fastboot/fb_fsl/fb_fsl_command.c       | 112 ++++++++++++++++---------
+ drivers/fastboot/fb_fsl/fb_fsl_common.c        |  55 ++++++++++++
+ drivers/fastboot/fb_fsl/fb_fsl_common.h        |  49 +++++++++++
+ drivers/fastboot/fb_fsl/fb_fsl_dev.c           |   2 +
+ drivers/fastboot/fb_fsl/fb_fsl_getvar.c        |  17 +---
+ lib/avb/fsl/fsl_avb.c                          |   4 +-
+ lib/avb/fsl/fsl_bootctl.c                      |   2 +-
+ 9 files changed, 261 insertions(+), 57 deletions(-)
+ create mode 100644 drivers/fastboot/fb_fsl/fastboot_lock_unlock.h
+ mode change 100644 => 100755 drivers/fastboot/fb_fsl/fb_fsl_command.c
+ mode change 100644 => 100755 drivers/fastboot/fb_fsl/fb_fsl_common.c
+ create mode 100755 drivers/fastboot/fb_fsl/fb_fsl_common.h
+ mode change 100644 => 100755 drivers/fastboot/fb_fsl/fb_fsl_dev.c
+
+diff --git a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h
+new file mode 100644
+index 0000000..06c69ca
+--- /dev/null
++++ b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (c) 2016, Freescale Semiconductor, Inc.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ *
++ * o Redistributions of source code must retain the above copyright notice, this list
++ *   of conditions and the following disclaimer.
++ *
++ * o Redistributions in binary form must reproduce the above copyright notice, this
++ *   list of conditions and the following disclaimer in the documentation and/or
++ *   other materials provided with the distribution.
++ *
++ * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
++ *   contributors may be used to endorse or promote products derived from this
++ *   software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
++ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
++ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef FASTBOOT_LOCK_UNLOCK_H
++#define FASTBOOT_LOCK_UNLOCK_H
++
++#define ALIGN_BYTES 64 /*armv7 cache line need 64 bytes aligned */
++
++//#define FASTBOOT_LOCK_DEBUG
++#ifdef CONFIG_FSL_CAAM_KB
++#define FASTBOOT_ENCRYPT_LOCK
++#endif
++
++#ifdef FASTBOOT_LOCK_DEBUG
++#define FB_DEBUG(format, ...) printf(format, ##__VA_ARGS__)
++#else
++#define FB_DEBUG(format, ...)
++#endif
++
++typedef enum {
++	FASTBOOT_UNLOCK,
++	FASTBOOT_LOCK,
++	FASTBOOT_LOCK_ERROR,
++	FASTBOOT_LOCK_NUM
++}FbLockState;
++
++typedef enum {
++	FASTBOOT_UL_DISABLE,
++	FASTBOOT_UL_ENABLE,
++	FASTBOOT_UL_ERROR,
++	FASTBOOT_UL_NUM
++}FbLockEnableResult;
++
++FbLockState fastboot_get_lock_stat(void);
++
++int fastboot_set_lock_stat(FbLockState lock);
++
++int fastboot_wipe_data_partition(void);
++void fastboot_wipe_all(void);
++
++FbLockEnableResult fastboot_lock_enable(void);
++void set_fastboot_lock_disable(void);
++
++int display_lock(FbLockState lock, int verify);
++
++bool valid_tos(void);
++#endif
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 3daaca6..86db5fe 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -41,6 +41,8 @@
+ #include <trusty/libtipc.h>
+ #endif
+ 
++#include "fb_fsl_common.h"
++
+ #if defined (CONFIG_ARCH_IMX8) || defined (CONFIG_ARCH_IMX8M)
+ #define DST_DECOMPRESS_LEN 1024*1024*32
+ #endif
+@@ -181,7 +183,6 @@ U_BOOT_CMD(
+ 	lock_status, 2, 1, do_lock_status,
+ 	"lock_status",
+ 	"lock_status");
+-}
+ #endif
+ 
+ #if defined(CONFIG_FLASH_MCUFIRMWARE_SUPPORT) && defined(CONFIG_ARCH_IMX8M)
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+old mode 100644
+new mode 100755
+index 6a5c16e..d9a87fb
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -48,6 +48,8 @@
+ #include <trusty/libtipc.h>
+ #endif
+ 
++#include "fb_fsl_common.h"
++
+ #define EP_BUFFER_SIZE			4096
+ 
+ /**
+@@ -60,45 +62,73 @@ static u32 fastboot_bytes_received;
+  */
+ static u32 fastboot_bytes_expected;
+ 
+-#if defined(CONFIG_AVB_SUPPORT) && defined(CONFIG_MMC)
+-static AvbABOps fsl_avb_ab_ops = {
+-	.read_ab_metadata = fsl_read_ab_metadata,
+-	.write_ab_metadata = fsl_write_ab_metadata,
+-	.ops = NULL
+-};
+-#ifdef CONFIG_AVB_ATX
+-static AvbAtxOps fsl_avb_atx_ops = {
+-	.ops = NULL,
+-	.read_permanent_attributes = fsl_read_permanent_attributes,
+-	.read_permanent_attributes_hash = fsl_read_permanent_attributes_hash,
+-#ifdef CONFIG_IMX_TRUSTY_OS
+-	.set_key_version = fsl_write_rollback_index_rpmb,
+-#else
+-	.set_key_version = fsl_set_key_version,
+-#endif
+-	.get_random = fsl_get_random
+-};
+-#endif
+-static AvbOps fsl_avb_ops = {
+-	.ab_ops = &fsl_avb_ab_ops,
+-#ifdef CONFIG_AVB_ATX
+-	.atx_ops = &fsl_avb_atx_ops,
+-#endif
+-	.read_from_partition = fsl_read_from_partition_multi,
+-	.write_to_partition = fsl_write_to_partition,
+-#ifdef CONFIG_AVB_ATX
+-	.validate_vbmeta_public_key = avb_atx_validate_vbmeta_public_key,
+-#else
+-	.validate_vbmeta_public_key = fsl_validate_vbmeta_public_key_rpmb,
+-#endif
+-	.read_rollback_index = fsl_read_rollback_index_rpmb,
+-	.write_rollback_index = fsl_write_rollback_index_rpmb,
+-	.read_is_device_unlocked = fsl_read_is_device_unlocked,
+-	.get_unique_guid_for_partition = fsl_get_unique_guid_for_partition,
+-	.get_size_of_partition = fsl_get_size_of_partition
+-};
+-#endif
++/* erase a partition on mmc */
++static void process_erase_mmc(const char *cmdbuf, char *response)
++{
++	int mmc_no = 0;
++	lbaint_t blks, blks_start, blks_size, grp_size;
++	struct mmc *mmc;
++	struct blk_desc *dev_desc;
++	struct fastboot_ptentry *ptn;
++	disk_partition_t info;
++
++	ptn = fastboot_flash_find_ptn(cmdbuf);
++	if ((ptn == NULL) || (ptn->flags & FASTBOOT_PTENTRY_FLAGS_UNERASEABLE)) {
++		sprintf(response, "FAILpartition does not exist or uneraseable");
++		fastboot_flash_dump_ptn();
++		return;
++	}
+ 
++	mmc_no = fastboot_devinfo.dev_id;
++	printf("erase target is MMC:%d\n", mmc_no);
++
++	mmc = find_mmc_device(mmc_no);
++	if ((mmc == NULL) || mmc_init(mmc)) {
++		printf("MMC card init failed!\n");
++		return;
++	}
++
++	dev_desc = blk_get_dev("mmc", mmc_no);
++	if (NULL == dev_desc) {
++		printf("Block device MMC %d not supported\n",
++			mmc_no);
++		sprintf(response, "FAILnot valid MMC card");
++		return;
++	}
++
++	if (part_get_info(dev_desc,
++				ptn->partition_index, &info)) {
++		printf("Bad partition index:%d for partition:%s\n",
++		ptn->partition_index, ptn->name);
++		sprintf(response, "FAILerasing of MMC card");
++		return;
++	}
++
++	/* Align blocks to erase group size to avoid erasing other partitions */
++	grp_size = mmc->erase_grp_size;
++	blks_start = (info.start + grp_size - 1) & ~(grp_size - 1);
++	if (info.size >= grp_size)
++		blks_size = (info.size - (blks_start - info.start)) &
++				(~(grp_size - 1));
++	else
++		blks_size = 0;
++
++	printf("Erasing blocks " LBAFU " to " LBAFU " due to alignment\n",
++	       blks_start, blks_start + blks_size);
++
++	blks = blk_derase(dev_desc, blks_start, blks_size);
++	if (blks != blks_size) {
++		printf("failed erasing from device %d", dev_desc->devnum);
++		sprintf(response, "FAILerasing of MMC card");
++		return;
++	}
++
++	printf("........ erased " LBAFU " bytes from '%s'\n",
++	       blks_size * info.blksz, cmdbuf);
++	sprintf(response, "OKAY");
++
++    return;
++}
+ 
+ /* Write the bcb with fastboot bootloader commands */
+ static void enable_fastboot_command(void)
+@@ -902,6 +932,12 @@ int fastboot_handle_command(char *cmd_string, char *response)
+ 
+ 	cmd_parameter = cmd_string;
+ 	strsep(&cmd_parameter, ":");
++	/* separate cmdstring for "fastboot oem/flashing" with a blank */
++	if(cmd_parameter == NULL)
++	{
++		cmd_parameter = cmd_string;
++		strsep(&cmd_parameter, " ");
++	}
+ 
+ 	for (i = 0; i < ARRAY_SIZE(commands); i++) {
+ 		if (commands[i].command != NULL &&
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_common.c b/drivers/fastboot/fb_fsl/fb_fsl_common.c
+old mode 100644
+new mode 100755
+index f7cfec0..d88a042
+--- a/drivers/fastboot/fb_fsl/fb_fsl_common.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_common.c
+@@ -46,6 +46,61 @@ extern int armv7_init_nonsec(void);
+ extern void trusty_os_init(void);
+ #endif
+ 
++#include "fb_fsl_common.h"
++
++#if defined(CONFIG_AVB_SUPPORT) && defined(CONFIG_MMC)
++AvbABOps fsl_avb_ab_ops = {
++	.read_ab_metadata = fsl_read_ab_metadata,
++	.write_ab_metadata = fsl_write_ab_metadata,
++	.ops = NULL
++};
++#ifdef CONFIG_AVB_ATX
++AvbAtxOps fsl_avb_atx_ops = {
++	.ops = NULL,
++	.read_permanent_attributes = fsl_read_permanent_attributes,
++	.read_permanent_attributes_hash = fsl_read_permanent_attributes_hash,
++#ifdef CONFIG_IMX_TRUSTY_OS
++	.set_key_version = fsl_write_rollback_index_rpmb,
++#else
++	.set_key_version = fsl_set_key_version,
++#endif
++	.get_random = fsl_get_random
++};
++#endif
++AvbOps fsl_avb_ops = {
++	.ab_ops = &fsl_avb_ab_ops,
++#ifdef CONFIG_AVB_ATX
++	.atx_ops = &fsl_avb_atx_ops,
++#endif
++	.read_from_partition = fsl_read_from_partition_multi,
++	.write_to_partition = fsl_write_to_partition,
++#ifdef CONFIG_AVB_ATX
++	.validate_vbmeta_public_key = avb_atx_validate_vbmeta_public_key,
++#else
++	.validate_vbmeta_public_key = fsl_validate_vbmeta_public_key_rpmb,
++#endif
++	.read_rollback_index = fsl_read_rollback_index_rpmb,
++        .write_rollback_index = fsl_write_rollback_index_rpmb,
++	.read_is_device_unlocked = fsl_read_is_device_unlocked,
++	.get_unique_guid_for_partition = fsl_get_unique_guid_for_partition,
++	.get_size_of_partition = fsl_get_size_of_partition
++};
++#endif
++
++int get_block_size(void) {
++        int dev_no = 0;
++        struct blk_desc *dev_desc;
++
++        dev_no = fastboot_devinfo.dev_id;
++        dev_desc = blk_get_dev(fastboot_devinfo.type == DEV_SATA ? "sata" : "mmc", dev_no);
++        if (NULL == dev_desc) {
++                printf("** Block device %s %d not supported\n",
++                       fastboot_devinfo.type == DEV_SATA ? "sata" : "mmc",
++                       dev_no);
++                return 0;
++        }
++        return dev_desc->blksz;
++}
+ 
+ struct fastboot_device_info fastboot_devinfo = {0xff, 0xff};
+ 
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_common.h b/drivers/fastboot/fb_fsl/fb_fsl_common.h
+new file mode 100755
+index 0000000..819c135
+--- /dev/null
++++ b/drivers/fastboot/fb_fsl/fb_fsl_common.h
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (c) 2016, Freescale Semiconductor, Inc.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without modification,
++ * are permitted provided that the following conditions are met:
++ *
++ * o Redistributions of source code must retain the above copyright notice, this list
++ *   of conditions and the following disclaimer.
++ *
++ * o Redistributions in binary form must reproduce the above copyright notice, this
++ *   list of conditions and the following disclaimer in the documentation and/or
++ *   other materials provided with the distribution.
++ *
++ * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
++ *   contributors may be used to endorse or promote products derived from this
++ *   software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
++ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
++ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef FB_FSL_COMMON_H
++#define FB_FSL_COMMON_H
++
++#ifdef CONFIG_AVB_SUPPORT
++#include <dt_table.h>
++#include <fsl_avb.h>
++#endif
++
++#if defined(CONFIG_AVB_SUPPORT) && defined(CONFIG_MMC)
++extern AvbABOps fsl_avb_ab_ops;
++#ifdef CONFIG_AVB_ATX
++extern AvbAtxOps fsl_avb_atx_ops;
++#endif
++extern AvbOps fsl_avb_ops;
++#endif
++
++int get_block_size(void);
++
++#endif	// FB_FSL_COMMON_H
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_dev.c b/drivers/fastboot/fb_fsl/fb_fsl_dev.c
+old mode 100644
+new mode 100755
+index 451d02d..ebf75e3
+--- a/drivers/fastboot/fb_fsl/fb_fsl_dev.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_dev.c
+@@ -19,6 +19,8 @@
+ #include <asm/setup.h>
+ #include <environment.h>
+ 
++#include "fb_fsl_common.h"
++
+ static lbaint_t mmc_sparse_write(struct sparse_storage *info,
+ 		lbaint_t blk, lbaint_t blkcnt, const void *buffer)
+ {
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_getvar.c b/drivers/fastboot/fb_fsl/fb_fsl_getvar.c
+index 1b1d654..6e675d4 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_getvar.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_getvar.c
+@@ -37,6 +37,8 @@
+ #include "fastboot_lock_unlock.h"
+ #endif
+ 
++#include "fb_fsl_common.h"
++
+ #ifdef CONFIG_IMX_TRUSTY_OS
+ #include "u-boot/sha256.h"
+ #include <trusty/libtipc.h>
+@@ -132,21 +134,6 @@ static char *get_serial(void)
+ #define VARIANT_NAME "NXP i.MX"
+ #endif
+ 
+-static int get_block_size(void) {
+-	int dev_no = 0;
+-	struct blk_desc *dev_desc;
+-
+-	dev_no = fastboot_devinfo.dev_id;
+-	dev_desc = blk_get_dev(fastboot_devinfo.type == DEV_SATA ? "sata" : "mmc", dev_no);
+-	if (NULL == dev_desc) {
+-		printf("** Block device %s %d not supported\n",
+-		       fastboot_devinfo.type == DEV_SATA ? "sata" : "mmc",
+-		       dev_no);
+-		return 0;
+-	}
+-	return dev_desc->blksz;
+-}
+-
+ #ifdef CONFIG_IMX_TRUSTY_OS
+ static void uuid_hex2string(uint8_t *uuid, char* buf, uint32_t uuid_len, uint32_t uuid_strlen) {
+ 	uint32_t i;
+diff --git a/lib/avb/fsl/fsl_avb.c b/lib/avb/fsl/fsl_avb.c
+index ff92654..cd70eba 100644
+--- a/lib/avb/fsl/fsl_avb.c
++++ b/lib/avb/fsl/fsl_avb.c
+@@ -8,8 +8,8 @@
+ #include <part.h>
+ #include <stdlib.h>
+ 
+-#include <fsl_fastboot.h>
+-#include "../../../drivers/usb/gadget/fastboot_lock_unlock.h"
++#include <fb_fsl.h>
++#include "../../../drivers/fastboot/fb_fsl/fastboot_lock_unlock.h"
+ 
+ #include <fsl_avb.h>
+ #include "fsl_avbkey.h"
+diff --git a/lib/avb/fsl/fsl_bootctl.c b/lib/avb/fsl/fsl_bootctl.c
+index 8f853bc..1143c3f 100755
+--- a/lib/avb/fsl/fsl_bootctl.c
++++ b/lib/avb/fsl/fsl_bootctl.c
+@@ -7,7 +7,7 @@
+ #include <common.h>
+ #include <stdlib.h>
+ #include <linux/string.h>
+-#include <fsl_fastboot.h>
++#include <fb_fsl.h>
+ #include <fsl_avb.h>
+ 
+ /* as libavb's bootctl doesn't have the get_var support
+-- 
+2.7.4
+

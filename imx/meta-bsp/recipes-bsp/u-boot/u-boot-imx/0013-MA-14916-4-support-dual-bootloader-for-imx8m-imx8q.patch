@@ -1,0 +1,297 @@
+From a902a938bcd6f028718071d4cebc7370d00c524c Mon Sep 17 00:00:00 2001
+From: Ji Luo <ji.luo@nxp.com>
+Date: Fri, 21 Jun 2019 15:53:50 +0800
+Subject: [PATCH 13/31] MA-14916-4 support dual bootloader for imx8m, imx8q
+
+this commit is a merge of three patches from imx_v2018.03 as below:
+
+1.
+commit dbcf1e3cc079d2f1b3df6c4c9ec3a34d0c05eb4c
+Author: Luo Ji <ji.luo@nxp.com>
+Date:   Fri Jun 8 10:31:11 2018 +0800
+
+    [iot] Support dual bootloader in SPL
+
+    Move the A/B slot check to SPL, the A/B slot switch
+    workflow is just like what we have in libavb_ab.
+
+    Test: A/B select works fine on imx8m.
+
+2.
+commit 71562aae3b8123ccd7503e596e478951568fcd24
+Author: Ji Luo <ji.luo@nxp.com>
+Date:   Mon Jan 14 18:28:08 2019 +0800
+
+    MA-13938 [Android] imx8q: Support dual bootloader feature
+
+    Support dual bootloader feature for imx8q which uses the
+    container format. Move the A/B slot select and verify to
+    SPL stage, the bootloader rollback index will be stored
+    at the last 8K bytes of eMMC rpmb storage.
+
+    Test: Boot and rbindex verify pass on imx8q.
+
+Change-Id: Ic9410a48092cc05de599dd897fc912177e2a1fe1
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ arch/arm/mach-imx/imx8/parser.c |  5 +++++
+ common/spl/spl_fit.c            | 14 ++++++++++++++
+ common/spl/spl_mmc.c            | 38 +++++++++++++++++++++++++++++++++++++-
+ disk/part_efi.c                 | 25 +++++++++++++++++++++++--
+ include/part.h                  |  3 ++-
+ include/spl.h                   |  3 +++
+ 6 files changed, 84 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/imx8/parser.c b/arch/arm/mach-imx/imx8/parser.c
+index 1a8e3e1..0845999 100644
+--- a/arch/arm/mach-imx/imx8/parser.c
++++ b/arch/arm/mach-imx/imx8/parser.c
+@@ -252,6 +252,11 @@ static int read_auth_container(struct spl_image_info *spl_image)
+ 		}
+ 	}
+ 
++#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_DUAL_BOOTLOADER)
++	/* Everything checks out, get the sw_version now. */
++	spl_image->rbindex = (uint64_t)container->sw_version;
++#endif
++
+ end_auth:
+ #ifdef CONFIG_AHAB_BOOT
+ 	if (sc_seco_authenticate(-1, SC_MISC_REL_CONTAINER, 0) != SC_ERR_NONE)
+diff --git a/common/spl/spl_fit.c b/common/spl/spl_fit.c
+index 9246c7e..ef10d86 100644
+--- a/common/spl/spl_fit.c
++++ b/common/spl/spl_fit.c
+@@ -31,6 +31,10 @@ __weak void* board_spl_fit_buffer_addr(ulong fit_size, int bl_len)
+ 			align_len) & ~align_len);
+ }
+ 
++#ifdef CONFIG_DUAL_BOOTLOADER
++extern int spl_fit_get_rbindex(const void *fit, int images);
++#endif
++
+ /**
+  * spl_fit_get_image_name(): By using the matching configuration subnode,
+  * retrieve the name of an image, specified by a property name and an index
+@@ -426,6 +430,16 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
+ 		return -1;
+ 	}
+ 
++#ifdef CONFIG_DUAL_BOOTLOADER
++    int rbindex;
++    rbindex = spl_fit_get_rbindex(fit, images);
++    if (rbindex < 0) {
++        printf("Error! Can't get rollback index!\n");
++        return -1;
++    } else
++        spl_image->rbindex = rbindex;
++#endif
++
+ #ifdef CONFIG_SPL_FPGA_SUPPORT
+ 	node = spl_fit_get_image_node(fit, images, "fpga", 0);
+ 	if (node >= 0) {
+diff --git a/common/spl/spl_mmc.c b/common/spl/spl_mmc.c
+index 3e3c43b..6fb2019 100644
+--- a/common/spl/spl_mmc.c
++++ b/common/spl/spl_mmc.c
+@@ -4,6 +4,9 @@
+  * Texas Instruments, <www.ti.com>
+  *
+  * Aneesh V <aneesh@ti.com>
++ *
++ * Copyright 2018 NXP
++ *
+  */
+ #include <common.h>
+ #include <dm.h>
+@@ -41,7 +44,7 @@ static int mmc_load_legacy(struct spl_image_info *spl_image, struct mmc *mmc,
+ 	return 0;
+ }
+ 
+-static ulong h_spl_load_read(struct spl_load_info *load, ulong sector,
++ulong h_spl_load_read(struct spl_load_info *load, ulong sector,
+ 			     ulong count, void *buf)
+ {
+ 	struct mmc *mmc = load->dev;
+@@ -54,6 +57,14 @@ static ulong h_spl_load_read(struct spl_load_info *load, ulong sector,
+ int check_rpmb_blob(struct mmc *mmc);
+ #endif
+ 
++#ifdef CONFIG_DUAL_BOOTLOADER
++/* Pre-declaration of mmc_load_image_raw_sector_dual_uboot().
++ */
++extern int mmc_load_image_raw_sector_dual_uboot(struct spl_image_info *spl_image,
++						struct mmc *mmc);
++extern int mmc_load_image_parse_container_dual_uboot(struct spl_image_info *spl_image,
++						struct mmc *mmc);
++#else
+ static __maybe_unused
+ int mmc_load_image_raw_sector(struct spl_image_info *spl_image,
+ 			      struct mmc *mmc, unsigned long sector)
+@@ -103,6 +114,8 @@ end:
+ 	return ret;
+ }
+ 
++#endif /* CONFIG_DUAL_BOOTLOADER */
++
+ static int spl_mmc_get_device_index(u32 boot_device)
+ {
+ 	switch (boot_device) {
+@@ -323,6 +336,14 @@ int __weak mmc_load_image_parse_container(struct spl_image_info *spl_image,
+ {
+ 	return -ENODEV;
+ };
++
++#ifdef CONFIG_DUAL_BOOTLOADER
++int __weak mmc_load_image_parse_container_dual_bootloader(struct spl_image_info *spl_image,
++					struct mmc *mmc, unsigned long sector)
++{
++	return -ENODEV;
++}
++#endif
+ #endif
+ 
+ int spl_mmc_load_image(struct spl_image_info *spl_image,
+@@ -354,10 +375,15 @@ int spl_mmc_load_image(struct spl_image_info *spl_image,
+ 			 * 1 and 2 match up to boot0 / boot1 and 7 is user data
+ 			 * which is the first physical partition (0).
+ 			 */
++#ifdef CONFIG_DUAL_BOOTLOADER
++			/* Bootloader is stored in eMMC user partition for dual bootloader */
++			part = 0;
++#else
+ 			part = (mmc->part_config >> 3) & PART_ACCESS_MASK;
+ 
+ 			if (part == 7)
+ 				part = 0;
++#endif
+ 
+ 			if (CONFIG_IS_ENABLED(MMC_TINY))
+ 				err = mmc_switch_part(mmc, part);
+@@ -389,6 +415,15 @@ int spl_mmc_load_image(struct spl_image_info *spl_image,
+ 			return err;
+ #endif
+ #ifdef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
++#ifdef CONFIG_DUAL_BOOTLOADER
++#ifdef CONFIG_PARSE_CONTAINER
++		err = mmc_load_image_parse_container_dual_uboot(spl_image,
++								mmc);
++#else
++		err = mmc_load_image_raw_sector_dual_uboot(spl_image,
++								mmc);
++#endif
++#else
+ #ifdef CONFIG_PARSE_CONTAINER
+ 		err = mmc_load_image_parse_container(spl_image, mmc,
+ 				spl_mmc_get_uboot_raw_sector(mmc));
+@@ -396,6 +431,7 @@ int spl_mmc_load_image(struct spl_image_info *spl_image,
+ 		err = mmc_load_image_raw_sector(spl_image, mmc,
+ 			spl_mmc_get_uboot_raw_sector(mmc));
+ #endif
++#endif
+ 		if (!err)
+ 			return err;
+ #endif
+diff --git a/disk/part_efi.c b/disk/part_efi.c
+index 5d7ad05..ef78c05 100644
+--- a/disk/part_efi.c
++++ b/disk/part_efi.c
+@@ -283,8 +283,10 @@ void part_print_efi(struct blk_desc *dev_desc)
+ 		printf("\tguid:\t%s\n", uuid);
+ 	}
+ 
++#if !defined(CONFIG_DUAL_BOOTLOADER) || !defined(CONFIG_SPL_BUILD)
+ 	/* Remember to free pte */
+ 	free(gpt_pte);
++#endif
+ 	return;
+ }
+ 
+@@ -319,7 +321,9 @@ int part_get_info_efi(struct blk_desc *dev_desc, int part,
+ 	    !is_pte_valid(&gpt_pte[part - 1])) {
+ 		debug("%s: *** ERROR: Invalid partition number %d ***\n",
+ 			__func__, part);
++#if !defined(CONFIG_DUAL_BOOTLOADER) || !defined(CONFIG_SPL_BUILD)
+ 		free(gpt_pte);
++#endif
+ 		return -1;
+ 	}
+ 
+@@ -346,8 +350,14 @@ int part_get_info_efi(struct blk_desc *dev_desc, int part,
+ 	debug("%s: start 0x" LBAF ", size 0x" LBAF ", name %s\n", __func__,
+ 	      info->start, info->size, info->name);
+ 
+-	/* Remember to free pte */
++#if !defined(CONFIG_DUAL_BOOTLOADER) || !defined(CONFIG_SPL_BUILD)
++	/* Heap memory is very limited in SPL, if the dual bootloader is
++	 * enabled, just load pte to dram instead of oc-ram. In such case,
++	 * this part of  memory shouldn't be freed. But in common routine,
++	 * don't forget to free the memory after use.
++	 */
+ 	free(gpt_pte);
++#endif
+ 	return 0;
+ }
+ 
+@@ -1081,10 +1091,19 @@ static gpt_entry *alloc_read_gpt_entries(struct blk_desc *dev_desc,
+ 	      (u32) le32_to_cpu(pgpt_head->sizeof_partition_entry),
+ 	      (ulong)count);
+ 
+-	/* Allocate memory for PTE, remember to FREE */
++	/* Allocate memory for PTE.
++	 * Heap memory is very limited in SPL, if the dual bootloader is
++	 * enabled, just load pte to dram instead of oc-ram. In such case,
++	 * this part of  memory shouldn't be freed. But in common routine,
++	 * don't forget to free the memory after use.
++	 */
+ 	if (count != 0) {
++#if defined(CONFIG_DUAL_BOOTLOADER) && defined(CONFIG_SPL_BUILD)
++		pte = (gpt_entry *)CONFIG_SYS_SPL_PTE_RAM_BASE;
++#else
+ 		pte = memalign(ARCH_DMA_MINALIGN,
+ 			       PAD_TO_BLOCKSIZE(count, dev_desc));
++#endif
+ 	}
+ 
+ 	if (count == 0 || pte == NULL) {
+@@ -1098,7 +1117,9 @@ static gpt_entry *alloc_read_gpt_entries(struct blk_desc *dev_desc,
+ 	blk_cnt = BLOCK_CNT(count, dev_desc);
+ 	if (blk_dread(dev_desc, blk, (lbaint_t)blk_cnt, pte) != blk_cnt) {
+ 		printf("*** ERROR: Can't read GPT Entries ***\n");
++#if !defined(CONFIG_DUAL_BOOTLOADER) || !defined(CONFIG_SPL_BUILD)
+ 		free(pte);
++#endif
+ 		return NULL;
+ 	}
+ 	return pte;
+diff --git a/include/part.h b/include/part.h
+index 0689b1f..c1a1b68 100644
+--- a/include/part.h
++++ b/include/part.h
+@@ -249,7 +249,8 @@ static inline int blk_get_device_part_str(const char *ifname,
+ #ifdef CONFIG_SPL_BUILD
+ # define part_print_ptr(x)	NULL
+ # if defined(CONFIG_SPL_FS_EXT4) || defined(CONFIG_SPL_FS_FAT) || \
+-	defined(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION)
++	defined(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION) || \
++	defined(CONFIG_DUAL_BOOTLOADER)
+ #  define part_get_info_ptr(x)	x
+ # else
+ #  define part_get_info_ptr(x)	NULL
+diff --git a/include/spl.h b/include/spl.h
+index f09909e..60f5676 100644
+--- a/include/spl.h
++++ b/include/spl.h
+@@ -79,6 +79,9 @@ struct spl_image_info {
+ 	ulong dcrc_length;
+ 	ulong dcrc;
+ #endif
++#ifdef CONFIG_DUAL_BOOTLOADER
++	uint64_t rbindex;
++#endif
+ };
+ 
+ /*
+-- 
+2.7.4
+

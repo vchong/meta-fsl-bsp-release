@@ -1,0 +1,95 @@
+From 0f695ce1d423971889f154a8d3e53a8ebc842fdb Mon Sep 17 00:00:00 2001
+From: Ji Luo <ji.luo@nxp.com>
+Date: Fri, 5 Jul 2019 09:18:36 +0800
+Subject: [PATCH 15/31] MA-12421 Fix CAAM not work on Android Things
+
+Blob buffer size is 48 bytes larger than the plain text buffer,
+set correct range when flush the dcache. Also use cache aligned
+buffer for the blob/plain_text to avoid failure in CAAM.
+
+Change-Id: I8f311b9d21fc7d26d60e9ba23dfb239d2582cedf
+Signed-off-by: Ji Luo <ji.luo@nxp.com>
+---
+ drivers/crypto/fsl_caam.c          | 20 ++++++++++----------
+ drivers/crypto/fsl_caam_internal.h |  2 ++
+ 2 files changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/crypto/fsl_caam.c b/drivers/crypto/fsl_caam.c
+index 793be6b..bc9fbbd 100644
+--- a/drivers/crypto/fsl_caam.c
++++ b/drivers/crypto/fsl_caam.c
+@@ -146,16 +146,16 @@ u32 caam_decap_blob(u32 plain_text, u32 blob_addr, u32 size)
+ 	init_job_desc(decap_desc, 0);
+ 	append_load(decap_desc, PTR2CAAMDMA(skeymod), key_sz,
+ 		    LDST_CLASS_2_CCB | LDST_SRCDST_BYTE_KEY);
+-	append_seq_in_ptr_intlen(decap_desc, blob_addr, size + 48, 0);
++	append_seq_in_ptr_intlen(decap_desc, blob_addr, size + CAAM_PAD_LEN, 0);
+ 	append_seq_out_ptr_intlen(decap_desc, plain_text, size, 0);
+ 	append_operation(decap_desc, OP_TYPE_DECAP_PROTOCOL | OP_PCLID_BLOB);
+ 
+ 	flush_dcache_range((uintptr_t)blob_addr & ALIGN_MASK,
+ 			   ((uintptr_t)blob_addr & ALIGN_MASK)
+-			    + ROUND(2 * size, ARCH_DMA_MINALIGN));
++			   + ROUND(size + CAAM_PAD_LEN, ARCH_DMA_MINALIGN));
+ 	flush_dcache_range((uintptr_t)plain_text & ALIGN_MASK,
+ 			   (plain_text & ALIGN_MASK)
+-			   + ROUND(2 * size, ARCH_DMA_MINALIGN));
++			   + ROUND(size, ARCH_DMA_MINALIGN));
+ 
+ 	/* Run descriptor with result written to blob buffer */
+ 	ret = do_job(decap_desc);
+@@ -191,15 +191,15 @@ u32 caam_gen_blob(u32 plain_data_addr, u32 blob_addr, u32 size)
+ 	append_load(encap_desc, PTR2CAAMDMA(skeymod), key_sz,
+ 		    LDST_CLASS_2_CCB | LDST_SRCDST_BYTE_KEY);
+ 	append_seq_in_ptr_intlen(encap_desc, plain_data_addr, size, 0);
+-	append_seq_out_ptr_intlen(encap_desc, PTR2CAAMDMA(blob), size + 48, 0);
++	append_seq_out_ptr_intlen(encap_desc, PTR2CAAMDMA(blob), size + CAAM_PAD_LEN, 0);
+ 	append_operation(encap_desc, OP_TYPE_ENCAP_PROTOCOL | OP_PCLID_BLOB);
+ 
+ 	flush_dcache_range((uintptr_t)plain_data_addr & ALIGN_MASK,
+ 			   (plain_data_addr & ALIGN_MASK)
+-			   + ROUND(2 * size, ARCH_DMA_MINALIGN));
++			   + ROUND(size, ARCH_DMA_MINALIGN));
+ 	flush_dcache_range((uintptr_t)blob & ALIGN_MASK,
+ 			   ((uintptr_t)blob & ALIGN_MASK)
+-			   + ROUND(2 * size, ARCH_DMA_MINALIGN));
++			   + ROUND(size + CAAM_PAD_LEN, ARCH_DMA_MINALIGN));
+ 
+ 	ret = do_job(encap_desc);
+ 
+@@ -354,6 +354,10 @@ static int do_job(u32 *desc)
+ 			   ((uintptr_t)desc & ALIGN_MASK)
+ 			   + ROUND(DESC_MAX_SIZE, ARCH_DMA_MINALIGN));
+ 
++	flush_dcache_range((uintptr_t)g_jrdata.outrings & ALIGN_MASK,
++			  ((uintptr_t)g_jrdata.outrings & ALIGN_MASK)
++			  + ROUND(DESC_MAX_SIZE, ARCH_DMA_MINALIGN));
++
+ 	/* Inform HW that a new JR is available */
+ #ifndef CONFIG_ARCH_IMX8
+ 	__raw_writel(1, CAAM_IRJAR0);
+@@ -365,10 +369,6 @@ static int do_job(u32 *desc)
+ 		;
+ #endif
+ 
+-	flush_dcache_range((uintptr_t)g_jrdata.outrings & ALIGN_MASK,
+-			   ((uintptr_t)g_jrdata.outrings & ALIGN_MASK)
+-			   + ROUND(DESC_MAX_SIZE, ARCH_DMA_MINALIGN));
+-
+ 	if (PTR2CAAMDMA(desc) == g_jrdata.outrings[0].desc) {
+ 		ret = g_jrdata.outrings[0].status;
+ 	} else {
+diff --git a/drivers/crypto/fsl_caam_internal.h b/drivers/crypto/fsl_caam_internal.h
+index 93e4328..e922d50 100644
+--- a/drivers/crypto/fsl_caam_internal.h
++++ b/drivers/crypto/fsl_caam_internal.h
+@@ -270,4 +270,6 @@ typedef enum {
+ 			RNG_DESC_SH1_SIZE + \
+ 			RNG_DESC_KEYS_SIZE)
+ 
++#define CAAM_PAD_LEN 48
++
+ #endif /* __CAAM_INTERNAL_H__ */
+-- 
+2.7.4
+

@@ -1,0 +1,73 @@
+From 366ee5eac9e591e771671bd5f9a74fe59aa67530 Mon Sep 17 00:00:00 2001
+From: "faqiang.zhu" <faqiang.zhu@nxp.com>
+Date: Tue, 11 Jun 2019 11:02:32 +0800
+Subject: [PATCH 06/31] MA-14916-1 adapt to the directory change of libavb
+
+libavb is now under the directory of lib/, not lib/avb/ as before, to
+adapt to this change, some modifications are made:
+1. header file inclusion change, including parameter of -I option in
+Makefile
+2. remove avb_sysdeps_posix.o in Makefile since the functions in
+avb_sysdeps_posix.c has beed redefined in fsl_avb_sysdeps_uboot.c
+
+Change-Id: I4216e3ddb4e3e810783e4f46b953eda510c2627b
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ drivers/fastboot/fb_fsl/Makefile    | 2 +-
+ lib/avb/Makefile                    | 2 +-
+ lib/avb/fsl/fsl_avb_sysdeps_uboot.c | 2 +-
+ lib/libavb/Makefile                 | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/fastboot/fb_fsl/Makefile b/drivers/fastboot/fb_fsl/Makefile
+index 34f90c7..61db7ed 100644
+--- a/drivers/fastboot/fb_fsl/Makefile
++++ b/drivers/fastboot/fb_fsl/Makefile
+@@ -4,7 +4,7 @@
+ # SPDX-License-Identifier:	GPL-2.0+
+ #
+ 
+-ccflags-y += -I./lib/avb
++ccflags-y += -I./lib
+ 
+ ifndef CONFIG_SPL_BUILD
+ obj-y += fb_fsl_dev.o fb_fsl_boot.o fb_fsl_command.o fb_fsl_common.o fb_fsl_getvar.o fb_fsl_partitions.o
+diff --git a/lib/avb/Makefile b/lib/avb/Makefile
+index 00957e2..21af6a2 100644
+--- a/lib/avb/Makefile
++++ b/lib/avb/Makefile
+@@ -1,4 +1,4 @@
+-subdir-ccflags-y += -I./lib/avb \
++subdir-ccflags-y += -I./lib \
+ 			-D_FILE_OFFSET_BITS=64 \
+ 			-D_POSIX_C_SOURCE=199309L \
+ 			-Wa,--noexecstack \
+diff --git a/lib/avb/fsl/fsl_avb_sysdeps_uboot.c b/lib/avb/fsl/fsl_avb_sysdeps_uboot.c
+index 5fcb69f..31e2171 100644
+--- a/lib/avb/fsl/fsl_avb_sysdeps_uboot.c
++++ b/lib/avb/fsl/fsl_avb_sysdeps_uboot.c
+@@ -26,7 +26,7 @@
+ #include <stdlib.h>
+ #include <linux/string.h>
+ 
+-#include "../libavb/libavb.h"
++#include <libavb/libavb.h>
+ 
+ int avb_memcmp(const void* src1, const void* src2, size_t n) {
+   return memcmp(src1, src2, n);
+diff --git a/lib/libavb/Makefile b/lib/libavb/Makefile
+index 9238240..ca9e47a 100644
+--- a/lib/libavb/Makefile
++++ b/lib/libavb/Makefile
+@@ -9,7 +9,7 @@ obj-$(CONFIG_LIBAVB) += avb_property_descriptor.o avb_sha256.o
+ obj-$(CONFIG_LIBAVB) += avb_slot_verify.o avb_util.o avb_version.o
+ obj-$(CONFIG_LIBAVB) += avb_descriptor.o avb_hash_descriptor.o
+ obj-$(CONFIG_LIBAVB) += avb_kernel_cmdline_descriptor.o avb_rsa.o avb_sha512.o
+-obj-$(CONFIG_LIBAVB) += avb_sysdeps_posix.o avb_vbmeta_image.o
++obj-$(CONFIG_LIBAVB) += avb_vbmeta_image.o
+ endif
+ obj-$(CONFIG_LIBAVB) += avb_crc32.o
+ 
+-- 
+2.7.4
+

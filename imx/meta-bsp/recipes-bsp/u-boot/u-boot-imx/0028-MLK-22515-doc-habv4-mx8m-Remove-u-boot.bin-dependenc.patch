@@ -1,0 +1,49 @@
+From 0ef6da001659ba38c7ae3ac19203682e4344fb28 Mon Sep 17 00:00:00 2001
+From: Breno Lima <breno.lima@nxp.com>
+Date: Tue, 27 Aug 2019 10:48:51 -0300
+Subject: [PATCH 28/31] MLK-22515 doc: habv4: mx8m: Remove u-boot.bin
+ dependency
+
+The u-boot.bin file is not included in flash.bin binary, remove it
+from mx8m_mx8mm_secure_boot.txt guide.
+
+Reviewed-by: Ye Li <ye.li@nxp.com>
+Signed-off-by: Breno Lima <breno.lima@nxp.com>
+(cherry picked from commit 92f238a1faaae3bbad27873704d33277f0663c40)
+---
+ doc/imx/habv4/guides/mx8m_mx8mm_secure_boot.txt | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/doc/imx/habv4/guides/mx8m_mx8mm_secure_boot.txt b/doc/imx/habv4/guides/mx8m_mx8mm_secure_boot.txt
+index 79cd10d..f7be3e6 100644
+--- a/doc/imx/habv4/guides/mx8m_mx8mm_secure_boot.txt
++++ b/doc/imx/habv4/guides/mx8m_mx8mm_secure_boot.txt
+@@ -50,13 +50,11 @@ file are covered by a digital signature.
+                  v   |          IVT - FIT          |   |
+              ------- +-----------------------------+   |
+                      |          CSF - FIT          |   |
+-             ------- +-----------------------------+   |
+-                 ^   |       u-boot-nodtb.bin      |   |  FIT
+-                 |   |               +             |   | Image
+-                 |   |          u-boot.bin         |   |
+-          Signed |   +-----------------------------+   |
+-           Data  |   |       OP-TEE (Optional)     |   |
++             ------- +-----------------------------+   |  FIT
++                 ^   |       u-boot-nodtb.bin      |   | Image
+                  |   +-----------------------------+   |
++          Signed |   |       OP-TEE (Optional)     |   |
++           Data  |   +-----------------------------+   |
+                  |   |        bl31.bin (ATF)       |   |
+                  |   +-----------------------------+   |
+                  v   |          u-boot.dtb         |   v
+@@ -153,7 +151,6 @@ The imx-mkimage project is used to combines all the images in a single
+ flash.bin binary, the following files are required:
+ 
+ - U-Boot:
+-  u-boot.bin
+   u-boot-nodtb.bin
+   u-boot-spl.bin
+   U-Boot DTB file (e.g. fsl-imx8mq-evk.dtb)
+-- 
+2.7.4
+

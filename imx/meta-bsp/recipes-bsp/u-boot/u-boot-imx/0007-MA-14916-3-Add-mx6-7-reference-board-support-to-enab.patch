@@ -1,0 +1,2476 @@
+From dea328f2aab729def83b7b6fa5faa0c0ab3c5c78 Mon Sep 17 00:00:00 2001
+From: Ye Li <ye.li@nxp.com>
+Date: Mon, 21 May 2018 02:32:08 -0700
+Subject: [PATCH 07/31] MA-14916-3: Add mx6/7 reference board support to enable
+ android fastboot
+
+this commit is based on the cherrypick of a patch from imx_v2018.03 with
+below commit info:
+"
+commit f15e20eeb42d421d694e75d6f159d908b5606e1f
+Author: Ye Li <ye.li@nxp.com>
+Date:   Mon May 21 02:32:08 2018 -0700
+
+MLK-18591-7 android: Add mx6/7 reference board support to enable android
+fastboot
+
+Add board level support for android fastboot feature. Each board has
+a android specified header file for defining android related configuraitons.
+And add build targets for their android uboot images building.
+"
+and then some modification is made to make the compilation pass.
+the defconfig files modification is based on corresponding files from
+BSP team, ucmd/acmd function is disabled for Android U-Boot.
+
+with defconfig files for 6ul chips, the compilation will terminate with
+failure on imx_v2018.03, so no modification was made on them.
+
+Change-Id: Ibe5979239e5e6a78b06f332c9041d1f1de2566fc
+Signed-off-by: Ye Li <ye.li@nxp.com>
+---
+ board/freescale/mx6qarm2/mx6qarm2.c                | 32 ++++++++
+ board/freescale/mx6slevk/mx6slevk.c                | 17 ++++
+ board/freescale/mx6sxsabreauto/mx6sxsabreauto.c    | 19 +++++
+ board/freescale/mx6sxsabresd/mx6sxsabresd.c        | 40 ++++++++++
+ board/freescale/mx6ul_14x14_evk/mx6ul_14x14_evk.c  | 19 +++++
+ board/freescale/mx7dsabresd/mx7dsabresd.c          | 47 +++++++++++
+ board/freescale/mx7ulp_evk/mx7ulp_evk.c            | 19 +++++
+ configs/imx6dlsabreautoandroid_defconfig           | 71 +++++++++++++++++
+ configs/imx6dlsabresdandroid_defconfig             | 80 +++++++++++++++++++
+ configs/imx6qarm2android_pop_lpddr2_revb_defconfig | 47 +++++++++++
+ configs/imx6qpsabreautoandroid_defconfig           | 71 +++++++++++++++++
+ configs/imx6qpsabresdandroid_defconfig             | 81 +++++++++++++++++++
+ configs/imx6qsabreautoandroid_defconfig            | 71 +++++++++++++++++
+ configs/imx6qsabresdandroid_defconfig              | 81 +++++++++++++++++++
+ configs/imx6slevkandroid_defconfig                 | 78 +++++++++++++++++++
+ configs/imx6solosabreautoandroid_defconfig         | 71 +++++++++++++++++
+ configs/imx6solosabresdandroid_defconfig           | 81 +++++++++++++++++++
+ configs/imx6sxsabreautoandroid_defconfig           | 82 +++++++++++++++++++
+ configs/imx6sxsabresdandroid_defconfig             | 89 +++++++++++++++++++++
+ configs/imx6ul_14x14_evk_android_defconfig         | 55 +++++++++++++
+ configs/imx6ul_14x14_evk_brillo_defconfig          | 55 +++++++++++++
+ configs/imx7dsabresdandroid_defconfig              | 91 ++++++++++++++++++++++
+ configs/imx7dsabresdbrillo_defconfig               | 90 +++++++++++++++++++++
+ configs/imx7ulp_evk_android_defconfig              | 81 +++++++++++++++++++
+ include/configs/mx6qarm2.h                         |  6 +-
+ include/configs/mx6qarm2_android.h                 | 76 ++++++++++++++++++
+ include/configs/mx6sabreandroid_common.h           | 42 ++++++++++
+ include/configs/mx6slevk.h                         |  4 +
+ include/configs/mx6slevkandroid.h                  | 57 ++++++++++++++
+ include/configs/mx6sxsabreauto.h                   |  4 +
+ include/configs/mx6sxsabreautoandroid.h            | 43 ++++++++++
+ include/configs/mx6sxsabresd.h                     |  4 +
+ include/configs/mx6sxsabresdandroid.h              | 46 +++++++++++
+ include/configs/mx6ul_14x14_evk.h                  |  8 ++
+ include/configs/mx6ul_14x14_evk_android.h          | 16 ++++
+ include/configs/mx6ul_14x14_evkandroidthings.h     | 37 +++++++++
+ include/configs/mx7dsabresd.h                      |  8 ++
+ include/configs/mx7dsabresd_androidthings.h        | 53 +++++++++++++
+ include/configs/mx7dsabresdandroid.h               | 41 ++++++++++
+ include/configs/mx7ulp_evk.h                       |  4 +
+ include/configs/mx7ulp_evk_android.h               | 47 +++++++++++
+ include/configs/mx_android_common.h                | 33 ++++++++
+ 42 files changed, 1996 insertions(+), 1 deletion(-)
+ create mode 100644 configs/imx6dlsabreautoandroid_defconfig
+ create mode 100644 configs/imx6dlsabresdandroid_defconfig
+ create mode 100644 configs/imx6qarm2android_pop_lpddr2_revb_defconfig
+ create mode 100644 configs/imx6qpsabreautoandroid_defconfig
+ create mode 100644 configs/imx6qpsabresdandroid_defconfig
+ create mode 100644 configs/imx6qsabreautoandroid_defconfig
+ create mode 100644 configs/imx6qsabresdandroid_defconfig
+ create mode 100644 configs/imx6slevkandroid_defconfig
+ create mode 100644 configs/imx6solosabreautoandroid_defconfig
+ create mode 100644 configs/imx6solosabresdandroid_defconfig
+ create mode 100644 configs/imx6sxsabreautoandroid_defconfig
+ create mode 100644 configs/imx6sxsabresdandroid_defconfig
+ create mode 100644 configs/imx6ul_14x14_evk_android_defconfig
+ create mode 100644 configs/imx6ul_14x14_evk_brillo_defconfig
+ create mode 100644 configs/imx7dsabresdandroid_defconfig
+ create mode 100644 configs/imx7dsabresdbrillo_defconfig
+ create mode 100644 configs/imx7ulp_evk_android_defconfig
+ create mode 100644 include/configs/mx6qarm2_android.h
+ create mode 100644 include/configs/mx6sabreandroid_common.h
+ create mode 100644 include/configs/mx6slevkandroid.h
+ create mode 100644 include/configs/mx6sxsabreautoandroid.h
+ create mode 100644 include/configs/mx6sxsabresdandroid.h
+ create mode 100644 include/configs/mx6ul_14x14_evk_android.h
+ create mode 100644 include/configs/mx6ul_14x14_evkandroidthings.h
+ create mode 100644 include/configs/mx7dsabresd_androidthings.h
+ create mode 100644 include/configs/mx7dsabresdandroid.h
+ create mode 100644 include/configs/mx7ulp_evk_android.h
+ create mode 100644 include/configs/mx_android_common.h
+
+diff --git a/board/freescale/mx6qarm2/mx6qarm2.c b/board/freescale/mx6qarm2/mx6qarm2.c
+index 7df64c7..637cfb0 100644
+--- a/board/freescale/mx6qarm2/mx6qarm2.c
++++ b/board/freescale/mx6qarm2/mx6qarm2.c
+@@ -19,6 +19,13 @@
+ #include <usb.h>
+ #include <asm/arch/sys_proto.h>
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fb_fsl.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include <recovery.h>
++#endif
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define UART_PAD_CTRL  (PAD_CTL_PUS_100K_UP |			\
+@@ -322,3 +329,28 @@ void ldo_mode_set(int ldo_bypass)
+ 	return;
+ }
+ #endif
++
++#ifdef CONFIG_FSL_FASTBOOT
++void board_fastboot_setup(void)
++{
++	if (!getenv("fastboot_dev"))
++		setenv("fastboot_dev", "mmc0");
++	if (!getenv("bootcmd"))
++		setenv("bootcmd", "boota mmc0");
++}
++
++#ifdef CONFIG_ANDROID_RECOVERY
++int check_recovery_cmd_file(void) {
++	return 0;
++}
++
++void board_recovery_setup(void)
++{
++	if (!getenv("bootcmd_android_recovery"))
++		setenv("bootcmd_android_recovery", "boota mmc0 recovery");
++
++	printf("setup env for recovery..\n");
++	setenv("bootcmd", "run bootcmd_android_recovery");
++}
++#endif
++#endif
+diff --git a/board/freescale/mx6slevk/mx6slevk.c b/board/freescale/mx6slevk/mx6slevk.c
+index eca593b..459c057 100644
+--- a/board/freescale/mx6slevk/mx6slevk.c
++++ b/board/freescale/mx6slevk/mx6slevk.c
+@@ -33,6 +33,13 @@
+ #include <lcd.h>
+ #include <mxc_epdc_fb.h>
+ #endif
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fb_fsl.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include "../common/recovery_keypad.h"
++#include <recovery.h>
++#endif
++#endif /*CONFIG_FSL_FASTBOOT*/
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -799,6 +806,16 @@ int setup_mxc_kpd(void)
+ }
+ #endif /*CONFIG_MXC_KPD*/
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++int is_recovery_key_pressing(void)
++{
++    return is_recovery_keypad_pressing();
++}
++
++#endif /*CONFIG_ANDROID_RECOVERY*/
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ #ifdef CONFIG_SPL_BUILD
+ #include <spl.h>
+ #include <linux/libfdt.h>
+diff --git a/board/freescale/mx6sxsabreauto/mx6sxsabreauto.c b/board/freescale/mx6sxsabreauto/mx6sxsabreauto.c
+index d3c7124..59aa62c 100644
+--- a/board/freescale/mx6sxsabreauto/mx6sxsabreauto.c
++++ b/board/freescale/mx6sxsabreauto/mx6sxsabreauto.c
+@@ -28,6 +28,13 @@
+ #include <usb/ehci-ci.h>
+ #include <pca953x.h>
+ #include <asm/mach-imx/video.h>
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fb_fsl.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include <recovery.h>
++#include "../common/recovery_keypad.h"
++#endif
++#endif /*CONFIG_FSL_FASTBOOT*/
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -513,3 +520,15 @@ int checkboard(void)
+ 
+ 	return 0;
+ }
++
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++int is_recovery_key_pressing(void)
++{
++	return is_recovery_keypad_pressing();
++}
++
++#endif /*CONFIG_ANDROID_RECOVERY*/
++
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+diff --git a/board/freescale/mx6sxsabresd/mx6sxsabresd.c b/board/freescale/mx6sxsabresd/mx6sxsabresd.c
+index 78b7779..575bac3 100644
+--- a/board/freescale/mx6sxsabresd/mx6sxsabresd.c
++++ b/board/freescale/mx6sxsabresd/mx6sxsabresd.c
+@@ -35,6 +35,14 @@
+ #include <asm/mach-imx/rdc-sema.h>
+ #include <asm/arch/imx-rdc.h>
+ #endif
++
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fb_fsl.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include <recovery.h>
++#endif
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
+@@ -68,6 +76,9 @@ DECLARE_GLOBAL_DATA_PTR;
+ #define LCD_PAD_CTRL    (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
+ 	PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
+ 
++#define BUTTON_PAD_CTRL    (PAD_CTL_PKE | PAD_CTL_PUE | \
++	PAD_CTL_PUS_22K_UP | PAD_CTL_DSE_40ohm)
++
+ #define WDOG_PAD_CTRL (PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_SPEED_MED |	\
+ 	PAD_CTL_DSE_40ohm)
+ 
+@@ -897,6 +908,35 @@ int checkboard(void)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++
++#define GPIO_VOL_DN_KEY IMX_GPIO_NR(1, 19)
++iomux_v3_cfg_t const recovery_key_pads[] = {
++	(MX6_PAD_CSI_DATA05__GPIO1_IO_19 | MUX_PAD_CTRL(BUTTON_PAD_CTRL)),
++};
++
++int is_recovery_key_pressing(void)
++{
++	int button_pressed = 0;
++
++	/* Check Recovery Combo Button press or not. */
++	imx_iomux_v3_setup_multiple_pads(recovery_key_pads,
++		ARRAY_SIZE(recovery_key_pads));
++
++	gpio_request(GPIO_VOL_DN_KEY, "volume_dn_key");
++	gpio_direction_input(GPIO_VOL_DN_KEY);
++
++	if (gpio_get_value(GPIO_VOL_DN_KEY) == 0) { /* VOL_DN key is low assert */
++		button_pressed = 1;
++		printf("Recovery key pressed\n");
++	}
++
++	return  button_pressed;
++}
++#endif /*CONFIG_ANDROID_RECOVERY*/
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ #ifdef CONFIG_SPL_BUILD
+ #include <linux/libfdt.h>
+ #include <spl.h>
+diff --git a/board/freescale/mx6ul_14x14_evk/mx6ul_14x14_evk.c b/board/freescale/mx6ul_14x14_evk/mx6ul_14x14_evk.c
+index f7c7689..2dcb84c 100644
+--- a/board/freescale/mx6ul_14x14_evk/mx6ul_14x14_evk.c
++++ b/board/freescale/mx6ul_14x14_evk/mx6ul_14x14_evk.c
+@@ -31,6 +31,13 @@
+ #include <usb/ehci-ci.h>
+ #include <asm/mach-imx/video.h>
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fb_fsl.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include <recovery.h>
++#endif
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
+@@ -683,6 +690,18 @@ int checkboard(void)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++int is_recovery_key_pressing(void)
++{
++	/* No key defined for this board */
++	return 0;
++}
++
++#endif /*CONFIG_ANDROID_RECOVERY*/
++
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ #ifdef CONFIG_SPL_BUILD
+ #include <linux/libfdt.h>
+ #include <spl.h>
+diff --git a/board/freescale/mx7dsabresd/mx7dsabresd.c b/board/freescale/mx7dsabresd/mx7dsabresd.c
+index 04c6086..e3bb157 100644
+--- a/board/freescale/mx7dsabresd/mx7dsabresd.c
++++ b/board/freescale/mx7dsabresd/mx7dsabresd.c
+@@ -30,6 +30,13 @@
+ #endif
+ #include <asm/mach-imx/video.h>
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fb_fsl.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include <recovery.h>
++#endif
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define UART_PAD_CTRL  (PAD_CTL_DSE_3P3V_49OHM | \
+@@ -50,6 +57,8 @@ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define NAND_PAD_READY0_CTRL (PAD_CTL_DSE_3P3V_49OHM | PAD_CTL_PUS_PU5KOHM)
+ 
++#define BUTTON_PAD_CTRL    (PAD_CTL_PUS_PU5KOHM | PAD_CTL_DSE_3P3V_98OHM)
++
+ #define EPDC_PAD_CTRL	0x0
+ 
+ #ifdef CONFIG_MXC_SPI
+@@ -592,6 +601,7 @@ int power_init_board(void)
+ {
+ 	struct udevice *dev;
+ 	int ret, dev_id, rev_id;
++	u32 sw3mode;
+ 
+ 	ret = pmic_get("pfuze3000", &dev);
+ 	if (ret == -ENODEV)
+@@ -610,6 +620,12 @@ int power_init_board(void)
+ 	 * the MIPI DSI and MIPI CSI inputs.
+ 	 */
+ 	pmic_clrsetbits(dev, PFUZE3000_VLD4CTL, 0xF, 0xA);
++	
++	/* change sw3 mode to avoid DDR power off */
++	sw3mode = pmic_reg_read(dev, PFUZE3000_SW3MODE);
++	ret = pmic_reg_write(dev, PFUZE3000_SW3MODE, sw3mode | 0x20);
++	if (ret < 0)
++		printf("PMIC: PFUZE3000 change sw3 mode failed\n");
+ 
+ 	return 0;
+ }
+@@ -663,3 +679,34 @@ int checkboard(void)
+ 
+ 	return 0;
+ }
++
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++
++/* Use S3 button for recovery key */
++#define GPIO_VOL_DN_KEY IMX_GPIO_NR(5, 10)
++iomux_v3_cfg_t const recovery_key_pads[] = {
++	(MX7D_PAD_SD2_WP__GPIO5_IO10 | MUX_PAD_CTRL(BUTTON_PAD_CTRL)),
++};
++
++int is_recovery_key_pressing(void)
++{
++	int button_pressed = 0;
++
++	/* Check Recovery Combo Button press or not. */
++	imx_iomux_v3_setup_multiple_pads(recovery_key_pads,
++		ARRAY_SIZE(recovery_key_pads));
++
++	gpio_request(GPIO_VOL_DN_KEY, "volume_dn_key");
++	gpio_direction_input(GPIO_VOL_DN_KEY);
++
++	if (gpio_get_value(GPIO_VOL_DN_KEY) == 0) { /* VOL_DN key is low assert */
++		button_pressed = 1;
++		printf("Recovery key pressed\n");
++	}
++
++	return  button_pressed;
++}
++
++#endif /*CONFIG_ANDROID_RECOVERY*/
++#endif /*CONFIG_FSL_FASTBOOT*/
+diff --git a/board/freescale/mx7ulp_evk/mx7ulp_evk.c b/board/freescale/mx7ulp_evk/mx7ulp_evk.c
+index 4a53793..90ca03c 100644
+--- a/board/freescale/mx7ulp_evk/mx7ulp_evk.c
++++ b/board/freescale/mx7ulp_evk/mx7ulp_evk.c
+@@ -16,6 +16,14 @@
+ #include <imx_mipi_dsi_bridge.h>
+ #include <mipi_dsi_panel.h>
+ 
++#ifdef CONFIG_FSL_FASTBOOT
++#include <fastboot.h>
++#include <asm/mach-imx/boot_mode.h>
++#ifdef CONFIG_ANDROID_RECOVERY
++#include <recovery.h>
++#endif /*CONFIG_ANDROID_RECOVERY*/
++#endif /*CONFIG_FSL_FASTBOOT*/
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define UART_PAD_CTRL	(PAD_CTL_PUS_UP)
+@@ -225,3 +233,14 @@ int board_late_init(void)
+ 
+ 	return 0;
+ }
++
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++int is_recovery_key_pressing(void)
++{
++	/* TODO: uboot can get the key event from M4 core*/
++	return 0;
++}
++
++#endif /*CONFIG_ANDROID_RECOVERY*/
++#endif /*CONFIG_FSL_FASTBOOT*/
+diff --git a/configs/imx6dlsabreautoandroid_defconfig b/configs/imx6dlsabreautoandroid_defconfig
+new file mode 100644
+index 0000000..3b1846e
+--- /dev/null
++++ b/configs/imx6dlsabreautoandroid_defconfig
+@@ -0,0 +1,71 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6DLSABREAUTO=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabreauto/mx6dl.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6dl-sabreauto"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_PCA953X=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_USB=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_USB_GADGET=y
++CONFIG_CI_UDC=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6dlsabresdandroid_defconfig b/configs/imx6dlsabresdandroid_defconfig
+new file mode 100644
+index 0000000..4d05484
+--- /dev/null
++++ b/configs/imx6dlsabresdandroid_defconfig
+@@ -0,0 +1,80 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6DLSABRESD=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabresd/mx6dlsabresd.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SPI_FLASH=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=20000000
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_MXC_SPI=y
++CONFIG_MII=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6dl-sabresd"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_PHYLIB=y
++CONFIG_DM_USB=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
+diff --git a/configs/imx6qarm2android_pop_lpddr2_revb_defconfig b/configs/imx6qarm2android_pop_lpddr2_revb_defconfig
+new file mode 100644
+index 0000000..06d8eaf
+--- /dev/null
++++ b/configs/imx6qarm2android_pop_lpddr2_revb_defconfig
+@@ -0,0 +1,47 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6QARM2=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6qarm2/mt128x64mx32.cfg,MX6DQ_POP_LPDDR2,DDR_MB=512"
++CONFIG_FASTBOOT=y
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=3
++CONFIG_BOARD_EARLY_INIT_F=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_MII=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_DEFAULT_DEVICE_TREE="imx6q-pop-arm2"
++CONFIG_DEFAULT_FDT_FILE="imx6q-pop-arm2.dtb"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_DM_USB=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_OF_LIBFDT=y
+diff --git a/configs/imx6qpsabreautoandroid_defconfig b/configs/imx6qpsabreautoandroid_defconfig
+new file mode 100644
+index 0000000..c08bfb9
+--- /dev/null
++++ b/configs/imx6qpsabreautoandroid_defconfig
+@@ -0,0 +1,71 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6QPSABREAUTO=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabreauto/mx6qp.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6qp-sabreauto"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_PCA953X=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_USB=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_USB_GADGET=y
++CONFIG_CI_UDC=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6qpsabresdandroid_defconfig b/configs/imx6qpsabresdandroid_defconfig
+new file mode 100644
+index 0000000..c38226e
+--- /dev/null
++++ b/configs/imx6qpsabresdandroid_defconfig
+@@ -0,0 +1,81 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6QPSABRESD=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabresd/mx6qp.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SPI_FLASH=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=20000000
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_MXC_SPI=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6qp-sabresd"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_DM_USB=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_LIBAVB=y
+diff --git a/configs/imx6qsabreautoandroid_defconfig b/configs/imx6qsabreautoandroid_defconfig
+new file mode 100644
+index 0000000..8618fbf
+--- /dev/null
++++ b/configs/imx6qsabreautoandroid_defconfig
+@@ -0,0 +1,71 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6QSABREAUTO=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabreauto/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6q-sabreauto"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_PCA953X=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_USB=y
++CONFIG_USB_GADGET=y
++CONFIG_CI_UDC=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6qsabresdandroid_defconfig b/configs/imx6qsabresdandroid_defconfig
+new file mode 100644
+index 0000000..6095834
+--- /dev/null
++++ b/configs/imx6qsabresdandroid_defconfig
+@@ -0,0 +1,81 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6QSABRESD=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabresd/mx6q_4x_mt41j128.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SPI_FLASH=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=20000000
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_MXC_SPI=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6q-sabresd"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_ETH=y
++CONFIG_DM_USB=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6slevkandroid_defconfig b/configs/imx6slevkandroid_defconfig
+new file mode 100644
+index 0000000..c1fba9b
+--- /dev/null
++++ b/configs/imx6slevkandroid_defconfig
+@@ -0,0 +1,78 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6SLEVK=y
++CONFIG_DEFAULT_DEVICE_TREE="imx6sl-evk"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6slevk/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_BOARD_EARLY_INIT_F=y
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_PART=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_USB=y
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_OF_CONTROL=y
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_DM=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_SPI_FLASH=y
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=20000000
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_MXC_SPI=y
++CONFIG_DM_THERMAL=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_DM_ETH=y
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x83800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6solosabreautoandroid_defconfig b/configs/imx6solosabreautoandroid_defconfig
+new file mode 100644
+index 0000000..dca8d68
+--- /dev/null
++++ b/configs/imx6solosabreautoandroid_defconfig
+@@ -0,0 +1,71 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6SOLOSABREAUTO=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabreauto/mx6solo.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6dl-sabreauto"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_PCA953X=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_USB=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_USB_GADGET=y
++CONFIG_CI_UDC=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x10000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6solosabresdandroid_defconfig b/configs/imx6solosabresdandroid_defconfig
+new file mode 100644
+index 0000000..e107fe7
+--- /dev/null
++++ b/configs/imx6solosabresdandroid_defconfig
+@@ -0,0 +1,81 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6SOLOSABRESD=y
++CONFIG_VIDEO=y
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sabresd/mx6solo_4x_mt41j128.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_SYS_CONSOLE_OVERWRITE_ROUTINE=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SPI_FLASH=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=20000000
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_MXC_SPI=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++# CONFIG_VIDEO_SW_CURSOR is not set
++# CONFIG_OF_LIBFDT=y
++
++CONFIG_DEFAULT_DEVICE_TREE="imx6dl-sabresd"
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_USB=y
++
++CONFIG_ENV_IS_IN_MMC=y
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x12C00000
++CONFIG_FASTBOOT_BUF_SIZE=0x10000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6sxsabreautoandroid_defconfig b/configs/imx6sxsabreautoandroid_defconfig
+new file mode 100644
+index 0000000..44a33c3
+--- /dev/null
++++ b/configs/imx6sxsabreautoandroid_defconfig
+@@ -0,0 +1,82 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6SXSABREAUTO=y
++CONFIG_DEFAULT_DEVICE_TREE="imx6sx-sabreauto"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sxsabreauto/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_NAND=y
++CONFIG_CMD_NAND_TRIMFFS=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_USB=y
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_TIME=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_PCA953X=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_NAND=y
++CONFIG_NAND_MXS=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_ETH=y
++CONFIG_FSL_QSPI=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++
++CONFIG_IMX_BOOTAUX=y
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x83800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
+diff --git a/configs/imx6sxsabresdandroid_defconfig b/configs/imx6sxsabresdandroid_defconfig
+new file mode 100644
+index 0000000..e4b141e
+--- /dev/null
++++ b/configs/imx6sxsabresdandroid_defconfig
+@@ -0,0 +1,89 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6SXSABRESD=y
++CONFIG_NXP_BOARD_REVISION=y
++CONFIG_DEFAULT_DEVICE_TREE="imx6sx-sdb"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6sxsabresd/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_PART=y
++CONFIG_CMD_PCI=y
++CONFIG_CMD_USB=y
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_BMP=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_TIME=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_SPANSION=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_PCI=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_VIDEO=y
++
++CONFIG_DM_ETH=y
++CONFIG_FSL_QSPI=y
++CONFIG_IMX_BOOTAUX=y
++
++CONFIG_SF_DEFAULT_BUS=1
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x83800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx6ul_14x14_evk_android_defconfig b/configs/imx6ul_14x14_evk_android_defconfig
+new file mode 100644
+index 0000000..2c3b24c
+--- /dev/null
++++ b/configs/imx6ul_14x14_evk_android_defconfig
+@@ -0,0 +1,55 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6UL_14X14_EVK=y
++CONFIG_DEFAULT_DEVICE_TREE="imx6ul-14x14-evk"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6ul_14x14_evk/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_BOARD_EARLY_INIT_F=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_BMP=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_NET=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_74X164=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_PHYLIB=y
++CONFIG_PHY_MICREL=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_FSL_QSPI=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_VIDEO=y
++CONFIG_DM_ETH=y
+diff --git a/configs/imx6ul_14x14_evk_brillo_defconfig b/configs/imx6ul_14x14_evk_brillo_defconfig
+new file mode 100644
+index 0000000..6b4d992
+--- /dev/null
++++ b/configs/imx6ul_14x14_evk_brillo_defconfig
+@@ -0,0 +1,55 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX6=y
++CONFIG_TARGET_MX6UL_14X14_EVK=y
++CONFIG_DEFAULT_DEVICE_TREE="imx6ul-14x14-evk"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx6ul_14x14_evk/imximage.cfg,ANDROID_THINGS_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_BOARD_EARLY_INIT_F=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMLS is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_BMP=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_NET=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_74X164=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_PHYLIB=y
++CONFIG_PHY_MICREL=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX6=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_FSL_QSPI=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_VIDEO=y
++CONFIG_DM_ETH=y
+diff --git a/configs/imx7dsabresdandroid_defconfig b/configs/imx7dsabresdandroid_defconfig
+new file mode 100644
+index 0000000..26b6219
+--- /dev/null
++++ b/configs/imx7dsabresdandroid_defconfig
+@@ -0,0 +1,91 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX7=y
++CONFIG_TARGET_MX7DSABRESD=y
++CONFIG_ARMV7_BOOT_SEC_DEFAULT=y
++# CONFIG_ARMV7_VIRT is not set
++CONFIG_IMX_RDC=y
++CONFIG_IMX_BOOTAUX=y
++CONFIG_NR_DRAM_BANKS=1
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx7dsabresd/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMI is not set
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_XIMG is not set
++# CONFIG_CMD_EXPORTENV is not set
++# CONFIG_CMD_IMPORTENV is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_BMP=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_PMIC=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="imx7d-sdb"
++CONFIG_DM_GPIO=y
++CONFIG_DM_74X164=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_MMC_IO_VOLTAGE=y
++CONFIG_MMC_UHS_SUPPORT=y
++CONFIG_MMC_HS200_SUPPORT=y
++CONFIG_FSL_ESDHC=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_EON=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX7=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_SOFT_SPI=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_MXC_USB_OTG_HACTIVE=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_VIDEO=y
++CONFIG_ERRNO_STR=y
++CONFIG_DM_ETH=y
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x83800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_FSL_FASTBOOT=y
++CONFIG_EFI_PARTITION=y
++
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx7dsabresdbrillo_defconfig b/configs/imx7dsabresdbrillo_defconfig
+new file mode 100644
+index 0000000..f234d23
+--- /dev/null
++++ b/configs/imx7dsabresdbrillo_defconfig
+@@ -0,0 +1,90 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX7=y
++CONFIG_TARGET_MX7DSABRESD=y
++CONFIG_ARMV7_BOOT_SEC_DEFAULT=y
++# CONFIG_ARMV7_VIRT is not set
++CONFIG_IMX_RDC=y
++CONFIG_IMX_BOOTAUX=y
++CONFIG_DEFAULT_DEVICE_TREE="imx7d-sdb"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx7dsabresd/imximage.cfg,ANDROID_THINGS_SUPPORT"
++CONFIG_EFI_PARTITION=y
++CONFIG_BOOTDELAY=0
++# CONFIG_CONSOLE_MUX is not set
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++# CONFIG_CMD_IMI is not set
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_XIMG is not set
++# CONFIG_CMD_EXPORTENV is not set
++# CONFIG_CMD_IMPORTENV is not set
++CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_SF=y
++CONFIG_CMD_USB=y
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_BMP=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_PMIC=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_OF_CONTROL=y
++CONFIG_DM_GPIO=y
++CONFIG_DM_74X164=y
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_MMC_IO_VOLTAGE=y
++CONFIG_MMC_UHS_SUPPORT=y
++CONFIG_MMC_HS200_SUPPORT=y
++CONFIG_SPI=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_EON=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX7=y
++CONFIG_DM_PMIC=y
++CONFIG_DM_PMIC_PFUZE100=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_PFUZE100=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_SPI=y
++CONFIG_SOFT_SPI=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_MXC_USB_OTG_HACTIVE=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_VIDEO=y
++CONFIG_ERRNO_STR=y
++CONFIG_DM_ETH=y
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x83800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_FSL_FASTBOOT=y
++CONFIG_EFI_PARTITION=y
++
++CONFIG_LIBAVB=y
++
+diff --git a/configs/imx7ulp_evk_android_defconfig b/configs/imx7ulp_evk_android_defconfig
+new file mode 100644
+index 0000000..9628cc3
+--- /dev/null
++++ b/configs/imx7ulp_evk_android_defconfig
+@@ -0,0 +1,81 @@
++CONFIG_ARM=y
++CONFIG_ARCH_MX7ULP=y
++CONFIG_SYS_TEXT_BASE=0x67800000
++CONFIG_TARGET_MX7ULP_EVK=y
++CONFIG_NR_DRAM_BANKS=1
++CONFIG_DEFAULT_DEVICE_TREE="imx7ulp-evk-qspi"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=board/freescale/mx7ulp_evk/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_BOUNCE_BUFFER=y
++CONFIG_EFI_PARTITION=y
++CONFIG_BOARD_LATE_INIT=y
++CONFIG_BOARD_EARLY_INIT_F=y
++CONFIG_HUSH_PARSER=y
++CONFIG_CMD_BOOTZ=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_MMC=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_DHCP=y
++CONFIG_OF_CONTROL=y
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_DM=y
++CONFIG_DM_GPIO=y
++CONFIG_IMX_RGPIO2P=y
++# CONFIG_MXC_GPIO is not set
++CONFIG_DM_I2C=y
++CONFIG_DM_MMC=y
++CONFIG_FSL_ESDHC=y
++CONFIG_SYS_I2C_IMX_LPI2C=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX7ULP=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_SERIAL=y
++CONFIG_FSL_LPUART=y
++CONFIG_CMD_SF=y
++CONFIG_FSL_QSPI=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_MACRONIX=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++CONFIG_ULP_WATCHDOG=y
++CONFIG_CMD_USB=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_MXC_USB_OTG_HACTIVE=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_HOST_ETHER=y
++CONFIG_USB_ETHER_ASIX=y
++CONFIG_USB_ETHER_RTL8152=y
++CONFIG_VIDEO=y
++CONFIG_IMX_NORTHWEST_MIPI_DSI=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++
++CONFIG_USB_GADGET=y
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_CI_UDC=y
++
++
++CONFIG_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_BUF_ADDR=0x60800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++
++CONFIG_LIBAVB=y
++
+diff --git a/include/configs/mx6qarm2.h b/include/configs/mx6qarm2.h
+index c3d60db..566840c 100644
+--- a/include/configs/mx6qarm2.h
++++ b/include/configs/mx6qarm2.h
+@@ -142,4 +142,8 @@
+ #define CONFIG_USB_MAX_CONTROLLER_COUNT	1
+ #endif
+ 
+-#endif				/* __CONFIG_H */
++#if defined(CONFIG_FASTBOOT)
++#include "mx6qarm2_android.h"
++#endif
++
++#endif                         /* __CONFIG_H */
+diff --git a/include/configs/mx6qarm2_android.h b/include/configs/mx6qarm2_android.h
+new file mode 100644
+index 0000000..75b4b70
+--- /dev/null
++++ b/include/configs/mx6qarm2_android.h
+@@ -0,0 +1,76 @@
++/*
++ * Copyright (C) 2013-2016 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef IMX6Q_ARM2_ANDROID_H
++#define IMX6Q_ARM2_ANDROID_H
++
++#define CONFIG_CI_UDC
++#define CONFIG_USBD_HS
++#define CONFIG_USB_GADGET_DUALSPEED
++
++#define CONFIG_USB_GADGET
++#define CONFIG_CMD_USB_MASS_STORAGE
++#define CONFIG_USB_FUNCTION_MASS_STORAGE
++#define CONFIG_USB_GADGET_DOWNLOAD
++#define CONFIG_USB_GADGET_VBUS_DRAW	2
++
++#define CONFIG_USB_GADGET_VENDOR_NUM	0x18d1
++#define CONFIG_USB_GADGET_PRODUCT_NUM	0x0d02
++#define CONFIG_USB_GADGET_MANUFACTURER	"FSL"
++
++#define CONFIG_USB_FUNCTION_FASTBOOT
++#define CONFIG_CMD_FASTBOOT
++#define CONFIG_CMD_READ
++#define CONFIG_BCB_SUPPORT
++#define CONFIG_ANDROID_BOOT_IMAGE
++#define CONFIG_FASTBOOT_FLASH
++
++/* For NAND we don't support lock/unlock */
++#ifndef CONFIG_NAND_BOOT
++#define CONFIG_FASTBOOT_LOCK
++#endif
++
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#define FSL_FASTBOOT_DATA_PART_NUM 4
++#define FSL_FASTBOOT_FB_PART_NUM 11
++#define FSL_FASTBOOT_PR_DATA_PART_NUM 12
++
++#define CONFIG_FSL_CAAM_KB
++#define CONFIG_CMD_FSL_CAAM_KB
++#define CONFIG_SHA1
++#define CONFIG_SHA256
++
++#define CONFIG_FSL_FASTBOOT
++#define CONFIG_ANDROID_RECOVERY
++
++#if defined CONFIG_NAND_BOOT
++#define CONFIG_FASTBOOT_STORAGE_NAND
++#elif defined CONFIG_SYS_BOOT_SATA
++#define CONFIG_FASTBOOT_STORAGE_SATA
++#else
++#define CONFIG_FASTBOOT_STORAGE_MMC
++#endif
++
++#if defined(CONFIG_FASTBOOT_STORAGE_NAND)
++#define ANDROID_FASTBOOT_NAND_PARTS "16m@64m(boot) 16m@80m(recovery) 810m@96m(android_root)ubifs"
++#endif
++
++#define CONFIG_CMD_BOOTA
++#define CONFIG_SUPPORT_RAW_INITRD
++#define CONFIG_SERIAL_TAG
++
++#undef CONFIG_EXTRA_ENV_SETTINGS
++#undef CONFIG_BOOTCOMMAND
++
++#define CONFIG_EXTRA_ENV_SETTINGS					\
++	"splashpos=m,m\0"	  \
++	"fdt_high=0xffffffff\0"	  \
++	"initrd_high=0xffffffff\0" \
++
++#define CONFIG_FASTBOOT_BUF_ADDR   CONFIG_SYS_LOAD_ADDR
++#define CONFIG_FASTBOOT_BUF_SIZE   0x19000000
++
++#endif /* IMX6Q_ARM2_ANDROID_H */
+diff --git a/include/configs/mx6sabreandroid_common.h b/include/configs/mx6sabreandroid_common.h
+new file mode 100644
+index 0000000..8a88a70
+--- /dev/null
++++ b/include/configs/mx6sabreandroid_common.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2013-2016 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2017 NXP
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef MX6_SABRE_ANDROID_COMMON_H
++#define MX6_SABRE_ANDROID_COMMON_H
++#include "mx_android_common.h"
++
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#define FASTBOOT_ENCRYPT_LOCK
++#define CONFIG_CMD_FSL_CAAM_KB
++#define CONFIG_SHA1
++#define CONFIG_SHA256
++
++#define CONFIG_AVB_SUPPORT
++#ifdef CONFIG_AVB_SUPPORT
++#define CONFIG_ANDROID_RECOVERY
++
++#ifdef CONFIG_SYS_CBSIZE
++#undef CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_CBSIZE 2048
++#endif
++
++#ifdef CONFIG_SYS_MAXARGS
++#undef CONFIG_SYS_MAXARGS
++#define CONFIG_SYS_MAXARGS     64
++#endif
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (96 * SZ_1M)
++#endif
++
++#endif /* CONFIG_AVB_SUPPORT */
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif /* MX6_SABRE_ANDROID_COMMON_H */
+diff --git a/include/configs/mx6slevk.h b/include/configs/mx6slevk.h
+index 7a5321c..9615e1f 100644
+--- a/include/configs/mx6slevk.h
++++ b/include/configs/mx6slevk.h
+@@ -224,4 +224,8 @@
+ 	#define CONFIG_WAVEFORM_BUF_SIZE		0x400000
+ #endif /* CONFIG_SPLASH_SCREEN */
+ 
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "mx6slevkandroid.h"
++#endif
++
+ #endif				/* __CONFIG_H */
+diff --git a/include/configs/mx6slevkandroid.h b/include/configs/mx6slevkandroid.h
+new file mode 100644
+index 0000000..e277186
+--- /dev/null
++++ b/include/configs/mx6slevkandroid.h
+@@ -0,0 +1,57 @@
++
++/*
++ * Copyright (C) 2013-2016 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2017 NXP
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef MX6SL_EVK_ANDROID_H
++#define MX6SL_EVK_ANDROID_H
++#include "mx_android_common.h"
++
++#include <asm/mach-imx/mxc_key_defs.h>
++
++/* lock/unlock stuff */
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++
++/*keyboard mapping*/
++#define CONFIG_VOL_DOWN_KEY     KEY_BACK
++#define CONFIG_POWER_KEY        KEY_5
++
++#define CONFIG_MXC_KPD
++#define CONFIG_MXC_KEYMAPPING \
++	{       \
++		KEY_SELECT, KEY_BACK, KEY_1,     KEY_2, \
++		KEY_3,      KEY_4,    KEY_5,     KEY_MENU, \
++		KEY_6,      KEY_7,    KEY_8,     KEY_9, \
++		KEY_UP,     KEY_LEFT, KEY_RIGHT, KEY_DOWN, \
++	}
++#define CONFIG_MXC_KPD_COLMAX 4
++#define CONFIG_MXC_KPD_ROWMAX 4
++
++#define CONFIG_AVB_SUPPORT
++#ifdef CONFIG_AVB_SUPPORT
++#define CONFIG_ANDROID_RECOVERY
++
++#ifdef CONFIG_SYS_CBSIZE
++#undef CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_CBSIZE 2048
++#endif
++
++#ifdef CONFIG_SYS_MAXARGS
++#undef CONFIG_SYS_MAXARGS
++#define CONFIG_SYS_MAXARGS     64
++#endif
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (96 * SZ_1M)
++#endif
++
++#endif /* CONFIG_AVB_SUPPORT */
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif
+diff --git a/include/configs/mx6sxsabreauto.h b/include/configs/mx6sxsabreauto.h
+index f136d2a..94d2eac 100644
+--- a/include/configs/mx6sxsabreauto.h
++++ b/include/configs/mx6sxsabreauto.h
+@@ -314,4 +314,8 @@
+ #endif
+ #endif
+ 
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "mx6sxsabreautoandroid.h"
++#endif
++
+ #endif				/* __CONFIG_H */
+diff --git a/include/configs/mx6sxsabreautoandroid.h b/include/configs/mx6sxsabreautoandroid.h
+new file mode 100644
+index 0000000..c07d43e
+--- /dev/null
++++ b/include/configs/mx6sxsabreautoandroid.h
+@@ -0,0 +1,43 @@
++
++/*
++ * Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX6SX_SABREAUTO_ANDROID_H
++#define __MX6SX_SABREAUTO_ANDROID_H
++#include "mx_android_common.h"
++
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#define FASTBOOT_ENCRYPT_LOCK
++#define CONFIG_CMD_FSL_CAAM_KB
++#define CONFIG_SHA1
++#define CONFIG_SHA256
++
++#define CONFIG_AVB_SUPPORT
++#ifdef CONFIG_AVB_SUPPORT
++#define CONFIG_ANDROID_RECOVERY
++
++#ifdef CONFIG_SYS_CBSIZE
++#undef CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_CBSIZE 2048
++#endif
++
++#ifdef CONFIG_SYS_MAXARGS
++#undef CONFIG_SYS_MAXARGS
++#define CONFIG_SYS_MAXARGS     64
++#endif
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (96 * SZ_1M)
++#endif
++
++#endif /* CONFIG_AVB_SUPPORT */
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif
+diff --git a/include/configs/mx6sxsabresd.h b/include/configs/mx6sxsabresd.h
+index 4f641ee..a0663f7 100644
+--- a/include/configs/mx6sxsabresd.h
++++ b/include/configs/mx6sxsabresd.h
+@@ -295,4 +295,8 @@
+ #define CONFIG_SYS_MMC_ENV_DEV		3  /*USDHC4*/
+ #define CONFIG_SYS_MMC_ENV_PART		0	/* user area */
+ 
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "mx6sxsabresdandroid.h"
++#endif
++
+ #endif				/* __CONFIG_H */
+diff --git a/include/configs/mx6sxsabresdandroid.h b/include/configs/mx6sxsabresdandroid.h
+new file mode 100644
+index 0000000..c5f91c4
+--- /dev/null
++++ b/include/configs/mx6sxsabresdandroid.h
+@@ -0,0 +1,46 @@
++
++/*
++ * Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX6SX_SABRESD_ANDROID_H
++#define __MX6SX_SABRESD_ANDROID_H
++#include "mx_android_common.h"
++
++/* For NAND we don't support lock/unlock */
++#ifndef CONFIG_NAND_BOOT
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#define FASTBOOT_ENCRYPT_LOCK
++#define CONFIG_CMD_FSL_CAAM_KB
++#define CONFIG_SHA1
++#define CONFIG_SHA256
++#endif
++
++#define CONFIG_AVB_SUPPORT
++#ifdef CONFIG_AVB_SUPPORT
++#define CONFIG_ANDROID_RECOVERY
++
++#ifdef CONFIG_SYS_CBSIZE
++#undef CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_CBSIZE 2048
++#endif
++
++#ifdef CONFIG_SYS_MAXARGS
++#undef CONFIG_SYS_MAXARGS
++#define CONFIG_SYS_MAXARGS     64
++#endif
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (96 * SZ_1M)
++#endif
++
++#endif /* CONFIG_AVB_SUPPORT */
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif
+diff --git a/include/configs/mx6ul_14x14_evk.h b/include/configs/mx6ul_14x14_evk.h
+index 6e7de16..3efac02 100644
+--- a/include/configs/mx6ul_14x14_evk.h
++++ b/include/configs/mx6ul_14x14_evk.h
+@@ -318,4 +318,12 @@
+ 
+ #define CONFIG_MODULE_FUSE
+ #define CONFIG_OF_SYSTEM_SETUP
++
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "mx6ul_14x14_evk_android.h"
++#endif
++
++#if defined(CONFIG_ANDROID_THINGS_SUPPORT)
++#include "mx6ul_14x14_evkandroidthings.h"
++#endif
+ #endif
+diff --git a/include/configs/mx6ul_14x14_evk_android.h b/include/configs/mx6ul_14x14_evk_android.h
+new file mode 100644
+index 0000000..26a7ac5
+--- /dev/null
++++ b/include/configs/mx6ul_14x14_evk_android.h
+@@ -0,0 +1,16 @@
++
++/*
++ * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX6UL_EVK_ANDROID_H
++#define __MX6UL_EVK_ANDROID_H
++#include "mx_android_common.h"
++
++#if defined(CONFIG_FASTBOOT_STORAGE_NAND)
++#define ANDROID_FASTBOOT_NAND_PARTS "16m@64m(boot) 16m@80m(recovery) 810m@96m(android_root)ubifs"
++#endif
++
++#endif
+diff --git a/include/configs/mx6ul_14x14_evkandroidthings.h b/include/configs/mx6ul_14x14_evkandroidthings.h
+new file mode 100644
+index 0000000..3485ce6
+--- /dev/null
++++ b/include/configs/mx6ul_14x14_evkandroidthings.h
+@@ -0,0 +1,37 @@
++
++/*
++ * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX6UL_14x14_EVKANDROIDTHINGS_H
++#define __MX6UL_14x14_EVKANDROIDTHINGS_H
++#include "mx_android_common.h"
++/* For NAND we don't support lock/unlock */
++#ifndef CONFIG_NAND_BOOT
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#endif
++
++#define CONFIG_CMD_FSL_CAAM_KB
++#define CONFIG_SHA1
++#define CONFIG_SHA256
++
++#define FASTBOOT_ENCRYPT_LOCK
++#ifdef CONFIG_AVB_SUPPORT
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (32 * SZ_1M)
++#endif
++
++#define CONFIG_SUPPORT_EMMC_RPMB
++#define CONFIG_PARTITION_UUIDS
++/* fuse bank size in word */
++#define CONFIG_AVB_FUSE_BANK_SIZEW 8
++#define CONFIG_AVB_FUSE_BANK_START 10
++#define CONFIG_AVB_FUSE_BANK_END 15
++#endif
++
++#endif
+diff --git a/include/configs/mx7dsabresd.h b/include/configs/mx7dsabresd.h
+index 4d1e60b..6e56454 100644
+--- a/include/configs/mx7dsabresd.h
++++ b/include/configs/mx7dsabresd.h
+@@ -345,4 +345,12 @@
+ #define QSPI0_AMBA_BASE			QSPI0_ARB_BASE_ADDR
+ #endif
+ 
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "mx7dsabresdandroid.h"
++#elif defined(CONFIG_ANDROID_THINGS_SUPPORT)
++#include "mx7dsabresd_androidthings.h"
++#else
++#define CONFIG_USBD_HS
++#endif
++
+ #endif	/* __CONFIG_H */
+diff --git a/include/configs/mx7dsabresd_androidthings.h b/include/configs/mx7dsabresd_androidthings.h
+new file mode 100644
+index 0000000..cdd3c77
+--- /dev/null
++++ b/include/configs/mx7dsabresd_androidthings.h
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX7DSABRESDBRSD_ANDROIDTHINGS_H
++#define __MX7DSABRESDBRSD_ANDROIDTHINGS_H
++#include "mx_android_common.h"
++
++/* For NAND we don't support lock/unlock */
++#ifndef CONFIG_NAND_BOOT
++#define CONFIG_FASTBOOT_LOCK
++#define CONFIG_ENABLE_LOCKSTATUS_SUPPORT
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#endif
++
++#define CONFIG_ANDROID_AB_SUPPORT
++#define FASTBOOT_ENCRYPT_LOCK
++
++#define CONFIG_SHA1
++#define CONFIG_SHA256
++
++
++#ifdef CONFIG_SYS_MMC_ENV_DEV
++#undef CONFIG_SYS_MMC_ENV_DEV
++#define CONFIG_SYS_MMC_ENV_DEV		1   /* USDHC2 */
++#endif
++
++#ifdef CONFIG_SYS_MMC_ENV_PART
++#undef CONFIG_SYS_MMC_ENV_PART
++#define CONFIG_SYS_MMC_ENV_PART		1	/* boot0 area */
++#endif
++
++#define CONFIG_SYSTEM_RAMDISK_SUPPORT
++#define CONFIG_CMD_FS_GENERIC
++
++#define CONFIG_AVB_SUPPORT
++#ifdef CONFIG_AVB_SUPPORT
++#define CONFIG_SUPPORT_EMMC_RPMB
++/* fuse bank size in word */
++/* infact 7D have no enough bits
++ * set this size to 0 will disable
++ * program/read FUSE */
++#define CONFIG_AVB_FUSE_BANK_SIZEW 0
++#define CONFIG_AVB_FUSE_BANK_START 0
++#define CONFIG_AVB_FUSE_BANK_END 0
++#endif
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif
++
+diff --git a/include/configs/mx7dsabresdandroid.h b/include/configs/mx7dsabresdandroid.h
+new file mode 100644
+index 0000000..d68566b
+--- /dev/null
++++ b/include/configs/mx7dsabresdandroid.h
+@@ -0,0 +1,41 @@
++
++/*
++ * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX7D_SABRESD_ANDROID_H
++#define __MX7D_SABRESD_ANDROID_H
++#include "mx_android_common.h"
++
++/* lock/unlock stuff */
++#define FASTBOOT_ENCRYPT_LOCK
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++#define CONFIG_SHA1
++
++#define CONFIG_AVB_SUPPORT
++#ifdef CONFIG_AVB_SUPPORT
++#define CONFIG_ANDROID_RECOVERY
++
++#ifdef CONFIG_SYS_CBSIZE
++#undef CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_CBSIZE 2048
++#endif
++
++#ifdef CONFIG_SYS_MAXARGS
++#undef CONFIG_SYS_MAXARGS
++#define CONFIG_SYS_MAXARGS     64
++#endif
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (96 * SZ_1M)
++#endif
++
++#endif /* CONFIG_AVB_SUPPORT */
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif /* __MX7D_SABRESD_ANDROID_H */
+diff --git a/include/configs/mx7ulp_evk.h b/include/configs/mx7ulp_evk.h
+index 98ea085..f4bdc17 100644
+--- a/include/configs/mx7ulp_evk.h
++++ b/include/configs/mx7ulp_evk.h
+@@ -227,6 +227,10 @@
+ 
+ #define CONFIG_OF_SYSTEM_SETUP
+ 
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "mx7ulp_evk_android.h"
++#endif
++
+ #ifdef CONFIG_IMX_OPTEE
+ #define TEE_ENV "tee=yes\0"
+ #else
+diff --git a/include/configs/mx7ulp_evk_android.h b/include/configs/mx7ulp_evk_android.h
+new file mode 100644
+index 0000000..fc1f054
+--- /dev/null
++++ b/include/configs/mx7ulp_evk_android.h
+@@ -0,0 +1,47 @@
++
++/*
++ * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __MX7ULP_EVK_ANDROID_H
++#define __MX7ULP_EVK_ANDROID_H
++#include "mx_android_common.h"
++
++#define CONFIG_CMD_FS_GENERIC
++#define CONFIG_CMD_EXT4
++#define CONFIG_CMD_EXT4_WRITE
++
++#define CONFIG_AVB_SUPPORT
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++
++#define CONFIG_ANDROID_RECOVERY
++#define CONFIG_SHA1
++
++#ifdef CONFIG_SYS_CBSIZE
++#undef CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_CBSIZE 2048
++#endif
++
++#ifdef CONFIG_SYS_MAXARGS
++#undef CONFIG_SYS_MAXARGS
++#define CONFIG_SYS_MAXARGS     64
++#endif
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (96 * SZ_1M)
++#endif
++
++/* Enable mcu firmware flash */
++#ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
++#define ANDROID_MCU_FRIMWARE_DEV_TYPE DEV_SF
++#define ANDROID_MCU_FIRMWARE_START 0
++#define ANDROID_MCU_FIRMWARE_SIZE  0x20000
++#endif
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif
+diff --git a/include/configs/mx_android_common.h b/include/configs/mx_android_common.h
+new file mode 100644
+index 0000000..dcbb624
+--- /dev/null
++++ b/include/configs/mx_android_common.h
+@@ -0,0 +1,33 @@
++/*
++ * Copyright 2017 NXP
++ */
++
++#ifndef __MX_ANDROID_COMMON_H
++#define __MX_ANDROID_COMMON_H
++
++#define CONFIG_USBD_HS
++
++#define CONFIG_BCB_SUPPORT
++#define CONFIG_CMD_READ
++
++#define CONFIG_CMD_USB_MASS_STORAGE
++#define CONFIG_USB_FUNCTION_MASS_STORAGE
++#define CONFIG_USB_GADGET_VBUS_DRAW     2
++
++#define CONFIG_ANDROID_RECOVERY
++
++#define CONFIG_CMD_BOOTA
++#define CONFIG_SUPPORT_RAW_INITRD
++#define CONFIG_SERIAL_TAG
++
++#undef CONFIG_EXTRA_ENV_SETTINGS
++#undef CONFIG_BOOTCOMMAND
++
++#define CONFIG_EXTRA_ENV_SETTINGS	\
++	"splashpos=m,m\0"	\
++	"fdt_high=0xffffffff\0"	\
++	"initrd_high=0xffffffff\0" \
++
++#define CONFIG_APPEND_BOOTARGS
++
++#endif /*MX_ANDROID_COMMON_H*/
+-- 
+2.7.4
+

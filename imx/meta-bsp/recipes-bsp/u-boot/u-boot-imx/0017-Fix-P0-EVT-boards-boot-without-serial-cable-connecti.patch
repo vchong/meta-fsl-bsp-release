@@ -1,0 +1,46 @@
+From eb163d98e446d90b9fb069f0a9dfd49cac616d2a Mon Sep 17 00:00:00 2001
+From: Leonid Lobachev <leonidl@google.com>
+Date: Mon, 16 Jul 2018 12:30:01 -0700
+Subject: [PATCH 17/31] Fix P0/EVT boards boot without serial cable connection.
+
+Change-Id: I5969217e400ab494f9a74662d1d228fcf2e2d465
+---
+ drivers/serial/serial_mxc.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/serial/serial_mxc.c b/drivers/serial/serial_mxc.c
+index 476df25..872a250 100644
+--- a/drivers/serial/serial_mxc.c
++++ b/drivers/serial/serial_mxc.c
+@@ -216,12 +216,27 @@ static void mxc_serial_putc(const char c)
+ 		WATCHDOG_RESET();
+ }
+ 
+-/* Test whether a character is in the RX buffer */
++/*
++ * Test whether a character is in the RX buffer
++ */
++static int one_time_rx_line_always_low_workaround_needed = 1;
+ static int mxc_serial_tstc(void)
+ {
+ 	/* If receive fifo is empty, return false */
+ 	if (readl(&mxc_base->ts) & UTS_RXEMPTY)
+ 		return 0;
++
++	/* Empty RX FIFO if receiver is stuck because of RXD line being low */
++	if (one_time_rx_line_always_low_workaround_needed) {
++		one_time_rx_line_always_low_workaround_needed = 0;
++		if (!(readl(&mxc_base->sr2) & USR2_RDR)) {
++			while (!(readl(&mxc_base->ts) & UTS_RXEMPTY)) {
++				(void) readl(&mxc_base->rxd);
++			}
++			return 0;
++		}
++	}
++
+ 	return 1;
+ }
+ 
+-- 
+2.7.4
+

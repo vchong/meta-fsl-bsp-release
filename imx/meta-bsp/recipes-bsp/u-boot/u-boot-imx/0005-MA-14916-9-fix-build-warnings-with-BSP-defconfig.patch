@@ -1,0 +1,191 @@
+From d57b5503d17d5fe450a534f85c4012c9946af35c Mon Sep 17 00:00:00 2001
+From: "faqiang.zhu" <faqiang.zhu@nxp.com>
+Date: Mon, 8 Jul 2019 20:30:04 +0800
+Subject: [PATCH 05/31] MA-14916-9 fix build warnings with BSP defconfig
+
+the warning info is as below:
+
+drivers/fastboot/fb_fsl/fb_fsl_command.c:66:13: warning: 'process_erase_mmc' defined but not used [-Wunused-function]
+static void process_erase_mmc(const char *cmdbuf, char *response)
+	             ^
+
+move this process_erase_mmc function to fb_fsl_dev.c and make remove the
+static attribute.
+
+Change-Id: Ifc30348e53693e26119c760406b4c650e591aef4
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ drivers/fastboot/fb_fsl/fb_fsl_command.c | 67 -------------------------------
+ drivers/fastboot/fb_fsl/fb_fsl_common.h  |  1 +
+ drivers/fastboot/fb_fsl/fb_fsl_dev.c     | 68 ++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 67 deletions(-)
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+index d9a87fb..5da84cf 100755
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -62,73 +62,6 @@ static u32 fastboot_bytes_received;
+  */
+ static u32 fastboot_bytes_expected;
+ 
+-/* erase a partition on mmc */
+-static void process_erase_mmc(const char *cmdbuf, char *response)
+-{
+-	int mmc_no = 0;
+-	lbaint_t blks, blks_start, blks_size, grp_size;
+-	struct mmc *mmc;
+-	struct blk_desc *dev_desc;
+-	struct fastboot_ptentry *ptn;
+-	disk_partition_t info;
+-
+-	ptn = fastboot_flash_find_ptn(cmdbuf);
+-	if ((ptn == NULL) || (ptn->flags & FASTBOOT_PTENTRY_FLAGS_UNERASEABLE)) {
+-		sprintf(response, "FAILpartition does not exist or uneraseable");
+-		fastboot_flash_dump_ptn();
+-		return;
+-	}
+-
+-	mmc_no = fastboot_devinfo.dev_id;
+-	printf("erase target is MMC:%d\n", mmc_no);
+-
+-	mmc = find_mmc_device(mmc_no);
+-	if ((mmc == NULL) || mmc_init(mmc)) {
+-		printf("MMC card init failed!\n");
+-		return;
+-	}
+-
+-	dev_desc = blk_get_dev("mmc", mmc_no);
+-	if (NULL == dev_desc) {
+-		printf("Block device MMC %d not supported\n",
+-			mmc_no);
+-		sprintf(response, "FAILnot valid MMC card");
+-		return;
+-	}
+-
+-	if (part_get_info(dev_desc,
+-				ptn->partition_index, &info)) {
+-		printf("Bad partition index:%d for partition:%s\n",
+-		ptn->partition_index, ptn->name);
+-		sprintf(response, "FAILerasing of MMC card");
+-		return;
+-	}
+-
+-	/* Align blocks to erase group size to avoid erasing other partitions */
+-	grp_size = mmc->erase_grp_size;
+-	blks_start = (info.start + grp_size - 1) & ~(grp_size - 1);
+-	if (info.size >= grp_size)
+-		blks_size = (info.size - (blks_start - info.start)) &
+-				(~(grp_size - 1));
+-	else
+-		blks_size = 0;
+-
+-	printf("Erasing blocks " LBAFU " to " LBAFU " due to alignment\n",
+-	       blks_start, blks_start + blks_size);
+-
+-	blks = blk_derase(dev_desc, blks_start, blks_size);
+-	if (blks != blks_size) {
+-		printf("failed erasing from device %d", dev_desc->devnum);
+-		sprintf(response, "FAILerasing of MMC card");
+-		return;
+-	}
+-
+-	printf("........ erased " LBAFU " bytes from '%s'\n",
+-	       blks_size * info.blksz, cmdbuf);
+-	sprintf(response, "OKAY");
+-
+-    return;
+-}
+ 
+ /* Write the bcb with fastboot bootloader commands */
+ static void enable_fastboot_command(void)
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_common.h b/drivers/fastboot/fb_fsl/fb_fsl_common.h
+index 819c135..4577d9e 100755
+--- a/drivers/fastboot/fb_fsl/fb_fsl_common.h
++++ b/drivers/fastboot/fb_fsl/fb_fsl_common.h
+@@ -45,5 +45,6 @@ extern AvbOps fsl_avb_ops;
+ #endif
+ 
+ int get_block_size(void);
++void process_erase_mmc(const char *cmdbuf, char *response);
+ 
+ #endif	// FB_FSL_COMMON_H
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_dev.c b/drivers/fastboot/fb_fsl/fb_fsl_dev.c
+index ebf75e3..feb65ed 100755
+--- a/drivers/fastboot/fb_fsl/fb_fsl_dev.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_dev.c
+@@ -482,3 +482,71 @@ void fastboot_process_flash(const char *cmdbuf, void *download_buffer,
+ 		break;
+ 	}
+ }
++
++/* erase a partition on mmc */
++void process_erase_mmc(const char *cmdbuf, char *response)
++{
++	int mmc_no = 0;
++	lbaint_t blks, blks_start, blks_size, grp_size;
++	struct mmc *mmc;
++	struct blk_desc *dev_desc;
++	struct fastboot_ptentry *ptn;
++	disk_partition_t info;
++
++	ptn = fastboot_flash_find_ptn(cmdbuf);
++	if ((ptn == NULL) || (ptn->flags & FASTBOOT_PTENTRY_FLAGS_UNERASEABLE)) {
++		sprintf(response, "FAILpartition does not exist or uneraseable");
++		fastboot_flash_dump_ptn();
++		return;
++	}
++
++	mmc_no = fastboot_devinfo.dev_id;
++	printf("erase target is MMC:%d\n", mmc_no);
++
++	mmc = find_mmc_device(mmc_no);
++	if ((mmc == NULL) || mmc_init(mmc)) {
++		printf("MMC card init failed!\n");
++		return;
++	}
++
++	dev_desc = blk_get_dev("mmc", mmc_no);
++	if (NULL == dev_desc) {
++		printf("Block device MMC %d not supported\n",
++			mmc_no);
++		sprintf(response, "FAILnot valid MMC card");
++		return;
++	}
++
++	if (part_get_info(dev_desc,
++				ptn->partition_index, &info)) {
++		printf("Bad partition index:%d for partition:%s\n",
++		ptn->partition_index, ptn->name);
++		sprintf(response, "FAILerasing of MMC card");
++		return;
++	}
++
++	/* Align blocks to erase group size to avoid erasing other partitions */
++	grp_size = mmc->erase_grp_size;
++	blks_start = (info.start + grp_size - 1) & ~(grp_size - 1);
++	if (info.size >= grp_size)
++		blks_size = (info.size - (blks_start - info.start)) &
++				(~(grp_size - 1));
++	else
++		blks_size = 0;
++
++	printf("Erasing blocks " LBAFU " to " LBAFU " due to alignment\n",
++	       blks_start, blks_start + blks_size);
++
++	blks = blk_derase(dev_desc, blks_start, blks_size);
++	if (blks != blks_size) {
++		printf("failed erasing from device %d", dev_desc->devnum);
++		sprintf(response, "FAILerasing of MMC card");
++		return;
++	}
++
++	printf("........ erased " LBAFU " bytes from '%s'\n",
++	       blks_size * info.blksz, cmdbuf);
++	sprintf(response, "OKAY");
++
++    return;
++}
+\ No newline at end of file
+-- 
+2.7.4
+

@@ -1,0 +1,63 @@
+From 09c5f5d5cd5d62e16c8d9f283aae614b095a7c9b Mon Sep 17 00:00:00 2001
+From: Ye Li <ye.li@nxp.com>
+Date: Fri, 7 Jun 2019 23:09:55 -0700
+Subject: [PATCH 01/31] MLK-21904 epdc: Fix EPDC waveform and logo file loading
+ failure
+
+Since new u-boot will prohibit loading image into memory which is used
+by u-boot, like (SP, malloc, relocate). When we allocate waveform buffer
+and logo buffer from malloc, loading to them will fail.
+
+Fix the issue by using system load address as a trampoline. Load the image
+to system load address first, then copy the data to buffers
+
+Signed-off-by: Ye Li <ye.li@nxp.com>
+Reviewed-by: Peng Fan <peng.fan@nxp.com>
+(cherry picked from commit 91b425d9c5208dce52f8ba646e0946f8eb15ea16)
+---
+ board/freescale/common/epdc_setup.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/board/freescale/common/epdc_setup.c b/board/freescale/common/epdc_setup.c
+index aebb56d..9b12096 100644
+--- a/board/freescale/common/epdc_setup.c
++++ b/board/freescale/common/epdc_setup.c
+@@ -32,7 +32,7 @@ int board_setup_waveform_file(ulong waveform_buf)
+ 	else
+ 		mmc_dev = mmc_get_env_devno();
+ 
+-	sprintf(addr, "%lx", waveform_buf);
++	sprintf(addr, "%lx", (ulong)CONFIG_SYS_LOAD_ADDR);
+ 
+ 	fs_argv[0] = "fatload";
+ 	fs_argv[1] = "mmc";
+@@ -52,6 +52,8 @@ int board_setup_waveform_file(ulong waveform_buf)
+ 	if (!file_len)
+ 		return -1;
+ 
++	memcpy((void *)waveform_buf, (const void *)CONFIG_SYS_LOAD_ADDR, file_len);
++
+ 	flush_cache(waveform_buf, roundup(file_len, ARCH_DMA_MINALIGN));
+ 
+ 	return 0;
+@@ -112,7 +114,7 @@ int board_setup_logo_file(void *display_buf)
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+-	sprintf(addr, "%lx", (ulong)buf);
++	sprintf(addr, "%lx", (ulong)CONFIG_SYS_LOAD_ADDR);
+ 
+ 	fs_argv[0] = "fatload";
+ 	fs_argv[1] = "mmc";
+@@ -129,6 +131,8 @@ int board_setup_logo_file(void *display_buf)
+ 		return -1;
+ 	}
+ 
++	memcpy((void *)buf, (const void *)CONFIG_SYS_LOAD_ADDR, file_len);
++
+ 	if (strncmp(buf, "P5", 2)) {
+ 		printf("Wrong format for epdc logo, use PGM-P5 format.\n");
+ 		free(buf);
+-- 
+2.7.4
+

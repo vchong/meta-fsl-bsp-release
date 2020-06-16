@@ -1,0 +1,30 @@
+From 08d08ac503dd696dbccf9f0c158a23d90defc7c9 Mon Sep 17 00:00:00 2001
+From: Haibo Chen <haibo.chen@nxp.com>
+Date: Fri, 9 Aug 2019 14:10:33 +0800
+Subject: [PATCH 25/31] MLK-22387 configs: imx7dsabresd: correct the emmc_dev
+
+For imx7d-sdb board, the emmc dev is 2, correct it, so
+UUU can work well.
+
+Signed-off-by: Haibo Chen <haibo.chen@nxp.com>
+(cherry picked from commit 1249561d0cc8fdca03776e9504d19620b991df1a)
+---
+ include/configs/mx7dsabresd.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/configs/mx7dsabresd.h b/include/configs/mx7dsabresd.h
+index 6e56454..79f2220 100644
+--- a/include/configs/mx7dsabresd.h
++++ b/include/configs/mx7dsabresd.h
+@@ -95,7 +95,7 @@
+ 	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
+ 	"initrd_addr=0x86800000\0" \
+ 	"initrd_high=0xffffffff\0" \
+-	"emmc_dev=1\0"\
++	"emmc_dev=2\0"\
+ 	"sd_dev=0\0" \
+ 	"mtdparts=" MFG_NAND_PARTITION \
+ 	"\0"\
+-- 
+2.7.4
+

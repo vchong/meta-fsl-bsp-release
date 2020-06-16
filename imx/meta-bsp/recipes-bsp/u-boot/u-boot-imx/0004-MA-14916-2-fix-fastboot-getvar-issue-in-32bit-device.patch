@@ -1,0 +1,136 @@
+From e7b958cb4d19e6124affc40362fc1f58d44f2a15 Mon Sep 17 00:00:00 2001
+From: "faqiang.zhu" <faqiang.zhu@nxp.com>
+Date: Thu, 13 Jun 2019 10:27:11 +0800
+Subject: [PATCH 04/31] MA-14916-2 fix fastboot getvar issue in 32bit device
+
+in imx_v2018.03, fastboot response buffer is an array defined in the
+handle function for "fastboot getvar", sizeof(response) will get the
+length of this array, which is FASTBOOT_RESPONSE_LEN.
+
+but in imx_v2019.04, "response" in "fastboot getvar" function is a
+pointer parameter transmitted to it, so sizeof(response) will only get
+the length of the pointer, not the buffer length. in 32bit device, the
+pointer length is 4, so the header info of fastboot can't be fully
+stored in the buffer in this case, cause the response info can't be
+parsed by host fastboot.
+
+this commit replace "sizeof(response)" to be FASTBOOT_RESPONSE_LEN
+directly.
+
+Change-Id: I9d3893406c0361b7aba9cba74b2d751bc311d142
+Signed-off-by: faqiang.zhu <faqiang.zhu@nxp.com>
+---
+ drivers/fastboot/fb_fsl/fb_fsl_getvar.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_getvar.c b/drivers/fastboot/fb_fsl/fb_fsl_getvar.c
+index 6e675d4..f506b54 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_getvar.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_getvar.c
+@@ -387,7 +387,7 @@ static int get_single_var(char *cmd, char *response)
+ 								location, &rbindex)
+ 								!= AVB_IO_RESULT_OK) {
+ 				printf("Read rollback index error!\n");
+-				snprintf(response, sizeof(response),
++				snprintf(response, FASTBOOT_RESPONSE_LEN,
+ 					"INFOread rollback index error when get avb-min-versions");
+ 				return -1;
+ 			}
+@@ -404,7 +404,7 @@ static int get_single_var(char *cmd, char *response)
+ 				/* reponse buffer is full, send it first */
+ 				fastboot_tx_write_more(response);
+ 				/* reset the reponse buffer for next round */
+-				memset(response, '\0', sizeof(response));
++				memset(response, '\0', FASTBOOT_RESPONSE_LEN);
+ 				strncpy(response, "INFO", 5);
+ 				/* Copy left strings from 'buffer' to 'response' */
+ 				strncat(response, buffer + chars_left, strlen(buffer));
+@@ -453,7 +453,7 @@ void fastboot_getvar(char *cmd, char *response)
+ 
+ 		/* get common variables */
+ 		for (n = 0; n < FASTBOOT_COMMON_VAR_NUM; n++) {
+-			snprintf(response, sizeof(response), "INFO%s:", fastboot_common_var[n]);
++			snprintf(response, FASTBOOT_RESPONSE_LEN, "INFO%s:", fastboot_common_var[n]);
+ 			get_single_var(fastboot_common_var[n], response);
+ 			fastboot_tx_write_more(response);
+ 		}
+@@ -461,21 +461,21 @@ void fastboot_getvar(char *cmd, char *response)
+ 		/* get at-vboot-state variables */
+ #ifdef CONFIG_AVB_ATX
+ 		for (n = 0; n < AT_VBOOT_STATE_VAR_NUM; n++) {
+-			snprintf(response, sizeof(response), "INFO%s:", fastboot_at_vboot_state_var[n]);
++			snprintf(response, FASTBOOT_RESPONSE_LEN, "INFO%s:", fastboot_at_vboot_state_var[n]);
+ 			get_single_var(fastboot_at_vboot_state_var[n], response);
+ 			fastboot_tx_write_more(response);
+ 		}
+ #endif
+ 		/* get partition type */
+ 		for (n = 0; n < g_pcount; n++) {
+-			snprintf(response, sizeof(response), "INFOpartition-type:%s:", g_ptable[n].name);
++			snprintf(response, FASTBOOT_RESPONSE_LEN, "INFOpartition-type:%s:", g_ptable[n].name);
+ 			snprintf(var_name, sizeof(var_name), "partition-type:%s", g_ptable[n].name);
+ 			get_single_var(var_name, response);
+ 			fastboot_tx_write_more(response);
+ 		}
+ 		/* get partition size */
+ 		for (n = 0; n < g_pcount; n++) {
+-			snprintf(response, sizeof(response), "INFOpartition-size:%s:", g_ptable[n].name);
++			snprintf(response, FASTBOOT_RESPONSE_LEN, "INFOpartition-size:%s:", g_ptable[n].name);
+ 			snprintf(var_name, sizeof(var_name), "partition-size:%s", g_ptable[n].name);
+ 			get_single_var(var_name,response);
+ 			fastboot_tx_write_more(response);
+@@ -485,36 +485,36 @@ void fastboot_getvar(char *cmd, char *response)
+ 			/* get has-slot variables */
+ 			count = fastboot_parts_get_name(partition_base_name);
+ 			for (n = 0; n < count; n++) {
+-				snprintf(response, sizeof(response), "INFOhas-slot:%s:", partition_base_name[n]);
++				snprintf(response, FASTBOOT_RESPONSE_LEN, "INFOhas-slot:%s:", partition_base_name[n]);
+ 				snprintf(var_name, sizeof(var_name), "has-slot:%s", partition_base_name[n]);
+ 				get_single_var(var_name,response);
+ 				fastboot_tx_write_more(response);
+ 			}
+ 			/* get current slot */
+-			strncpy(response, "INFOcurrent-slot:", sizeof(response));
++			strncpy(response, "INFOcurrent-slot:", FASTBOOT_RESPONSE_LEN);
+ 			get_single_var("current-slot", response);
+ 			fastboot_tx_write_more(response);
+ 			/* get slot count */
+-			strncpy(response, "INFOslot-count:", sizeof(response));
++			strncpy(response, "INFOslot-count:", FASTBOOT_RESPONSE_LEN);
+ 			get_single_var("slot-count", response);
+ 			fastboot_tx_write_more(response);
+ 			/* get slot-successful variable */
+ 			for (n = 0; n < 2; n++) {
+-				snprintf(response, sizeof(response), "INFOslot-successful:%s:", slot_suffix[n]);
++				snprintf(response, FASTBOOT_RESPONSE_LEN, "INFOslot-successful:%s:", slot_suffix[n]);
+ 				snprintf(var_name, sizeof(var_name), "slot-successful:%s", slot_suffix[n]);
+ 				get_single_var(var_name, response);
+ 				fastboot_tx_write_more(response);
+ 			}
+ 			/*get slot-unbootable variable*/
+ 			for (n = 0; n < 2; n++) {
+-				snprintf(response, sizeof(response), "INFOslot-unbootable:%s:", slot_suffix[n]);
++				snprintf(response, FASTBOOT_RESPONSE_LEN, "INFOslot-unbootable:%s:", slot_suffix[n]);
+ 				snprintf(var_name, sizeof(var_name), "slot-unbootable:%s", slot_suffix[n]);
+ 				get_single_var(var_name, response);
+ 				fastboot_tx_write_more(response);
+ 			}
+ 			/*get slot-retry-count variable*/
+ 			for (n = 0; n < 2; n++) {
+-				snprintf(response, sizeof(response), "INFOslot-retry-count:%s:", slot_suffix[n]);
++				snprintf(response, FASTBOOT_RESPONSE_LEN, "INFOslot-retry-count:%s:", slot_suffix[n]);
+ 				snprintf(var_name, sizeof(var_name), "slot-retry-count:%s", slot_suffix[n]);
+ 				get_single_var(var_name, response);
+ 				fastboot_tx_write_more(response);
+@@ -531,7 +531,7 @@ void fastboot_getvar(char *cmd, char *response)
+ 	else if (!strcmp_l1("at-vboot-state", cmd)) {
+ 			/* get at-vboot-state variables */
+ 		for (n = 0; n < AT_VBOOT_STATE_VAR_NUM; n++) {
+-			snprintf(response, sizeof(response), "INFO%s:", fastboot_at_vboot_state_var[n]);
++			snprintf(response, FASTBOOT_RESPONSE_LEN, "INFO%s:", fastboot_at_vboot_state_var[n]);
+ 			get_single_var(fastboot_at_vboot_state_var[n], response);
+ 			fastboot_tx_write_more(response);
+ 		}
+-- 
+2.7.4
+
