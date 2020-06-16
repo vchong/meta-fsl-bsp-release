@@ -13,12 +13,14 @@ DEPENDS = "optee-os-imx optee-client-imx python-pycrypto-native openssl"
 
 SRCBRANCH = "master"
 SRCURL ?= "git://bitbucket.sw.nxp.com/mmiot/optee-secure-hdcp-control.git;protocol=ssh"
-SRC_URI = "${SRCURL};branch=${SRCBRANCH}"
-SRCREV = "${AUTOREV}"
+SRC_URI = "file://optee-secure-hdcp-control.tgz"
+SRC_URI[md5sum] = "e7e746051b429f2e3524fa5c82db184e"
+#SRCREV = "${AUTOREV}"
 
 TARGET_CC_ARCH += "${LDFLAGS}"
 
-S = "${WORKDIR}/git"
+S = "${WORKDIR}/optee-secure-hdcp-control"
+B = "${WORKDIR}/optee-secure-hdcp-control"
 
 do_compile () {
     if [ ${DEFAULTTUNE} = "aarch64" ];then

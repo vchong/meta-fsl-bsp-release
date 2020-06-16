@@ -13,12 +13,14 @@ DEPENDS = "optee-os-imx optee-client-imx python-pycrypto-native openssl"
 
 SRCBRANCH = "master"
 SRCURL ?= "git://bitbucket.sw.nxp.com/mmiot/provisioning.git;protocol=ssh"
-SRC_URI = "${SRCURL};branch=${SRCBRANCH}"
-SRCREV = "${AUTOREV}"
+SRC_URI = "file://provisioning.tgz"
+SRC_URI[md5sum] = "b7b3b90ca8deab60796731edd2d51d8d"
+#SRCREV = "${AUTOREV}"
 
 TARGET_CC_ARCH += "${LDFLAGS}"
 
-S = "${WORKDIR}/git"
+S = "${WORKDIR}/provisioning"
+B = "${WORKDIR}/provisioning"
 
 do_compile () {
     if [ ${DEFAULTTUNE} = "aarch64" ];then
