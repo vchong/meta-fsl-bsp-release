@@ -93,7 +93,7 @@ EXTRA_OEMAKE_append = " ${@bb.utils.contains('DISTRO_FEATURES', 'sdp', \
 do_compile () {
     unset LDFLAGS
     export CFLAGS="${CFLAGS} --sysroot=${STAGING_DIR_HOST}"
-    oe_runmake -C ${S} all CFG_TEE_TA_LOG_LEVEL=0
+    oe_runmake -C ${S} all CFG_TEE_TA_LOG_LEVEL=3 CFG_TEE_CORE_LOG_LEVEL=3
 }
 
 
