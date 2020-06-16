@@ -26,7 +26,13 @@ SRCBRANCH = "MM_04.04.07_1906_L4.14.98"
 SRC_URI = "${IMXGST_SRC};branch=${SRCBRANCH} \
            file://0001-imx-gst1.0-plugin-Update-KERNEL_VERSION-check.patch \
 "
-#DRM_PATCH
+
+SRC_URI += "file://0001-vpudec-Enable-VPU-secure-mode.patch;md5sum=51c28fee7aa4ac0464b120b3a2655741" 
+SRC_URI += "file://0002-vpudec-Request-byte-stream-format-for-H264.patch;md5sum=e7d204165f1d490165991dde436ae40a" 
+SRC_URI += "file://0003-vpu-Request-HEVC-in-bytes-stream-format-for-SDP.patch;md5sum=a526b6a5f68045e2ece987a9d552edbd" 
+SRC_URI += "file://0004-vpudecobject-Configure-secure-buffer-allocation-size.patch;md5sum=640fecc3b4fdeddc5debba68e6d74359" 
+SRC_URI += "file://0005-aiurdemux-Reduce-aiurdemux-rank.patch;md5sum=b696501dbea7f1e096b9ecd31a7734aa" 
+SRC_URI += "file://0006-MMIOT-498-Select-allocator-based-on-the-secure-field.patch;md5sum=882394fcdb7dd82aadc100eed0ea7433" 
 SRCREV = "aeebe91727c3228723015cd3086c449ea23e1a5d" 
 
 S = "${WORKDIR}/git"
