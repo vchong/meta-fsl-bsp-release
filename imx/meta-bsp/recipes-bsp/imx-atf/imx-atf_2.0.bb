@@ -13,7 +13,15 @@ ATF_SRC ?= "git://source.codeaurora.org/external/imx/imx-atf.git;protocol=https"
 SRCBRANCH = "imx_4.14.98_2.1.0"
 
 SRC_URI = "${ATF_SRC};branch=${SRCBRANCH}"
-#DRM_PATCH
+
+SRC_URI += "file://0001-MLK-22207-plat-imx8m-Fix-the-data-sync-issue-in-dram.patch;md5sum=db6d6b5c4997ba3a19a90caab9a5634b" 
+SRC_URI += "file://0002-Revert-plat-imx8mm-change-DISPMIX-power-domain-handl.patch;md5sum=0cc6bdacb962023e65ef8b4efffef144" 
+SRC_URI += "file://0003-MMIOT-244-On-secure-closed-board-linux-can-t-configu.patch;md5sum=c1824de8dcf2b18051221390adf8e427" 
+SRC_URI += "file://0004-MMIOT-191-Do-not-prevent-VPU-to-decode-in-CMA.patch;md5sum=f1818fafecb0d900ca287e8f0b33cc6c" 
+SRC_URI += "file://0005-MMIOT-193-Setup-CSU-VPU-access-in-TZ-only.patch;md5sum=c59972e6ad585043a5b9f8d497f66c97" 
+SRC_URI += "file://0006-MMIOT-193-imx8mm-csu-config-updated-with-Secure-VPU-.patch;md5sum=02f69dfa940a60c01b9ce7bfa4974f13" 
+SRC_URI += "file://0007-MMIOT-193-Fix-CFG_SECURE_HANTRO_VPU-flag-definition.patch;md5sum=ab3c257453e325b8abb08e58268c87dd" 
+SRC_URI += "file://0008-MMIOT-412-Add-PCIe-slave-in-default-CSU-configuratio.patch;md5sum=0b905f72a6c73b9753b2b48795e3038a" 
 SRCREV = "727cf896a4c79d152dae4537e28400c747bf39b9"
 
 S = "${WORKDIR}/git"
