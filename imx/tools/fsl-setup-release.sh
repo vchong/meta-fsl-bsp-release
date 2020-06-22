@@ -136,12 +136,15 @@ fi
 
 # On the first script run, backup the local.conf file
 # Consecutive runs, it restores the backup and changes are appended on this one.
-if [ ! -e $BUILD_DIR/conf/local.conf.org ]; then
-    cp $BUILD_DIR/conf/local.conf $BUILD_DIR/conf/local.conf.org
-else
-    cp $BUILD_DIR/conf/local.conf.org $BUILD_DIR/conf/local.conf
-fi
-
+#if [ ! -e $BUILD_DIR/conf/local.conf.org ]; then
+#    cp $BUILD_DIR/conf/local.conf $BUILD_DIR/conf/local.conf.org
+#else
+#    cp $BUILD_DIR/conf/local.conf.org $BUILD_DIR/conf/local.conf
+#fi
+echo "#################"
+echo "USE MY local.conf"
+echo "#################"
+cp $BUILD_DIR/../../../my/local.conf.my $BUILD_DIR/conf/local.conf
 
 if [ ! -e $BUILD_DIR/conf/bblayers.conf.org ]; then
     cp $BUILD_DIR/conf/bblayers.conf $BUILD_DIR/conf/bblayers.conf.org
