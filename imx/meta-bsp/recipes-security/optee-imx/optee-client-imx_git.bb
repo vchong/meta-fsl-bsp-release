@@ -21,6 +21,7 @@ SRC_URI += "file://0007-config-tee_supplicant_android-.mk-improve-legibility.pat
 SRC_URI += "file://0008-simplify-use-of-TEE-fs-related-configs.patch;md5sum=a1c6ad8df58aae1fddef04e51b31880f" 
 SRC_URI += "file://0009-CFG_TEE_FS_PARENT_PATH-now-include-tee.patch;md5sum=3b01c89db5b65dce9de5ab9af411a435" 
 SRC_URI += "file://0010-Protect-memcpy-against-client-application-providing-.patch;md5sum=0eb688ae916143e09bf2d66725cd2d13" 
+SRC_URI += "file://print_invokecmd_res_origin.patch"
 SRCREV = "bc0ec8ce1e4dc5ae23f4737ef659338b7cd408fe"
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"

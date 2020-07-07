@@ -1,0 +1,42 @@
+diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
+index c6df4317ca9f..d825ebd5915e 100644
+--- a/drivers/tee/optee/rpc.c
++++ b/drivers/tee/optee/rpc.c
+@@ -159,6 +159,9 @@ static void handle_rpc_supp_cmd(struct tee_context *ctx,
+ 	params = kmalloc_array(arg->num_params, sizeof(struct tee_param),
+ 			       GFP_KERNEL);
+ 	if (!params) {
++		pr_info("#####################################\n");
++		pr_info("handle_rpc_supp_cmd kmalloc_array oom\n");
++		pr_info("#####################################\n");
+ 		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
+ 		return;
+ 	}
+@@ -236,6 +239,9 @@ static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
+ 	}
+ 
+ 	if (IS_ERR(shm)) {
++		pr_info("#############################################\n");
++		pr_info("handle_rpc_func_cmd_shm_alloc IS_ERR(shm) oom\n");
++		pr_info("#############################################\n");
+ 		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
+ 		return;
+ 	}
+diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+index df35fc01fd3e..d467185d5668 100644
+--- a/drivers/tee/optee/supp.c
++++ b/drivers/tee/optee/supp.c
+@@ -92,8 +92,12 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+ 	bool interruptable;
+ 	u32 ret;
+ 
+-	if (!req)
++	if (!req) {
++		pr_info("#####################################\n");
++		pr_info("optee_supp_thrd_req oom\n");
++		pr_info("#####################################\n");
+ 		return TEEC_ERROR_OUT_OF_MEMORY;
++	}
+ 
+ 	init_completion(&req->c);
+ 	req->func = func;

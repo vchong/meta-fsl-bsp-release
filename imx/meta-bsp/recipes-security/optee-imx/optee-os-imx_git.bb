@@ -61,6 +61,7 @@ SRC_URI += "file://0045-libmbedtls-mbedtls_mpi_shrink-fix-possible-unwanted-.pat
 SRC_URI += "file://0046-imx8mq-Add-a-warning-if-VPU-do-not-support-TZASC.patch;md5sum=550e460bf2229ce38095344d9ddf4223" 
 SRC_URI += "file://0047-core-csu-add-imx8m-csu-protection.patch;md5sum=9c0af9980e9ecff1866797d599ddede1" 
 SRC_URI += "file://0048-MMIOT-499-Increase-amount-of-MEM_AREA_RES_VASPACE-me.patch;md5sum=b17d0ece69df66227ea81ac8fdf96c8f" 
+SRC_URI += "file://incr_shmem_size.patch"
 SRCREV = "65d11b9078bed0d1fe2908b473a55e038db2280c"
 
 S = "${WORKDIR}/git"
