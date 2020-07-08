@@ -1,14 +1,238 @@
 diff --git a/libteec/src/tee_client_api.c b/libteec/src/tee_client_api.c
-index 7099f6d..4534644 100644
+index 6de957f..5b0f971 100644
 --- a/libteec/src/tee_client_api.c
 +++ b/libteec/src/tee_client_api.c
-@@ -636,6 +636,9 @@ out_free_temp_refs:
+@@ -483,6 +483,7 @@ static TEEC_Result ioctl_errno_to_res(int err)
+ {
+ 	switch (err) {
+ 	case ENOMEM:
++		EMSG("ENOMEM -> TEEC_ERROR_OUT_OF_MEMORY");
+ 		return TEEC_ERROR_OUT_OF_MEMORY;
+ 	default:
+ 		return TEEC_ERROR_GENERIC;
+@@ -639,6 +640,101 @@ void TEEC_CloseSession(TEEC_Session *session)
+ 		EMSG("Failed to close session 0x%x", session->session_id);
+ }
+ 
++#include <inttypes.h>
++#define TAF(name) case name: return #name
++
++const char *taf_to_str(uint32_t cmd_id)
++{
++	switch (cmd_id) {
++	TAF(OPTEE_WV_INITIALIZE);
++	TAF(OPTEE_WV_TERMINATE);
++	TAF(OPTEE_WV_INSTALLKEYBOX);
++	TAF(OPTEE_WV_INSTALLROOTKEYCERTIFICATE);
++	TAF(OPTEE_WV_GETKEYDATA);
++	TAF(OPTEE_WV_ISKEYBOXVALID);
++	TAF(OPTEE_WV_ISROOTKEYCERTIFICATEVALID);
++	TAF(OPTEE_WV_GETRANDOM);
++	TAF(OPTEE_WV_GETDEVICEID);
++	TAF(OPTEE_WV_WRAPKEYBOX);
++	TAF(OPTEE_WV_OPENSESSION);
++	TAF(OPTEE_WV_CLOSESESSION);
++	TAF(OPTEE_WV_DECRYPTCTR_V10);
++	TAF(OPTEE_WV_GENERATEDERIVEDKEYS);
++	TAF(OPTEE_WV_GENERATESIGNATURE);
++	TAF(OPTEE_WV_GENERATENONCE);
++	TAF(OPTEE_WV_LOADKEYS_V8);
++	TAF(OPTEE_WV_REFRESHKEYS);
++	TAF(OPTEE_WV_SELECTKEY_V13);
++	TAF(OPTEE_WV_REWRAPDEVICERSAKEY);
++	TAF(OPTEE_WV_LOADDEVICERSAKEY);
++	TAF(OPTEE_WV_GENERATERSASIGNATURE_V8);
++	TAF(OPTEE_WV_DERIVEKEYSFROMSESSIONKEY);
++	TAF(OPTEE_WV_APIVERSION);
++	TAF(OPTEE_WV_SECURITYLEVEL);
++	TAF(OPTEE_WV_GENERIC_ENCRYPT);
++	TAF(OPTEE_WV_GENERIC_DECRYPT);
++	TAF(OPTEE_WV_GENERIC_SIGN);
++	TAF(OPTEE_WV_GENERIC_VERIFY);
++	TAF(OPTEE_WV_GETHDCPCAPABILITY_V9);
++	TAF(OPTEE_WV_SUPPORTSUSAGETABLE);
++	TAF(OPTEE_WV_UPDATEUSAGETABLE);
++	TAF(OPTEE_WV_DEACTIVATEUSAGEENTRY_V12);
++	TAF(OPTEE_WV_REPORTUSAGE);
++	TAF(OPTEE_WV_DELETEUSAGEENTRY);
++	TAF(OPTEE_WV_DELETEUSAGETABLE);
++	TAF(OPTEE_WV_LOADKEYS_V9_OR_V10);
++	TAF(OPTEE_WV_GENERATERSASIGNATURE);
++	TAF(OPTEE_WV_GETMAXNUMBEROFSESSIONS);
++	TAF(OPTEE_WV_GETNUMBEROFOPENSESSIONS);
++	TAF(OPTEE_WV_ISANTIROLLBACKHWPRESENT);
++	TAF(OPTEE_WV_COPYBUFFER);
++	TAF(OPTEE_WV_QUERYKEYCONTROL);
++	TAF(OPTEE_WV_LOADTESTKEYBOX_V13);
++	TAF(OPTEE_WV_FORCEDELETEUSAGEENTRY);
++	TAF(OPTEE_WV_GETHDCPCAPABILITY);
++	TAF(OPTEE_WV_LOADTESTRSAKEY);
++	TAF(OPTEE_WV_SECURITY_PATCH_LEVEL);
++	TAF(OPTEE_WV_LOADKEYS_V11_OR_V12);
++	TAF(OPTEE_WV_DECRYPTCENC);
++	TAF(OPTEE_WV_GETPROVISIONINGMETHOD);
++	TAF(OPTEE_WV_GETOEMPUBLICCERTIFICATE);
++	TAF(OPTEE_WV_REWRAPDEVICERSAKEY30);
++	TAF(OPTEE_WV_SUPPORTEDCERTIFICATES);
++	TAF(OPTEE_WV_ISSRMUPDATESUPPORTED);
++	TAF(OPTEE_WV_GETCURRENTSRMVERSION);
++	TAF(OPTEE_WV_LOADSRM);
++	TAF(OPTEE_WV_LOADKEYS_V13);
++	TAF(OPTEE_WV_REMOVESRM);
++	TAF(OPTEE_WV_CREATEUSAGETABLEHEADER);
++	TAF(OPTEE_WV_LOADUSAGETABLEHEADER);
++	TAF(OPTEE_WV_CREATENEWUSAGEENTRY);
++	TAF(OPTEE_WV_LOADUSAGEENTRY);
++	TAF(OPTEE_WV_UPDATEUSAGEENTRY);
++	TAF(OPTEE_WV_DEACTIVATEUSAGEENTRY);
++	TAF(OPTEE_WV_SHRINKUSAGETABLEHEADER);
++	TAF(OPTEE_WV_MOVEENTRY);
++	TAF(OPTEE_WV_COPYOLDUSAGEENTRY);
++	TAF(OPTEE_WV_CREATEOLDUSAGEENTRY);
++	TAF(OPTEE_WV_GETANALOGOUTPUTFLAGS);
++	TAF(OPTEE_WV_LOADTESTKEYBOX);
++	TAF(OPTEE_WV_LOADENTITLEDCONTENTKEYS);
++	TAF(OPTEE_WV_SELECTKEY);
++	TAF(OPTEE_WV_LOADKEYS);
++	TAF(OPTEE_WV_MESSAGEISVALID);
++	TAF(OPTEE_WV_MANAGETIMER);
++	TAF(OPTEE_WV_AUTHENTICATEKEYS);
++	TAF(OPTEE_WV_REFRESHKEYSTATEANDTIMER);
++	TAF(OPTEE_WV_GETRSAKEYSTRING);
++	TAF(OPTEE_WV_IMPORTRSAKEY);
++	TAF(OPTEE_WV_REWRAPRSAKEY);
++	TAF(OPTEE_WV_LOADRSAKEY);
++	TAF(OPTEE_WV_GETUSAGEENTRYLEN);
++	default:
++		EMSG("Unknown TAF id %" PRIu32 "\n", cmd_id);
++		return "Unknown TAF id";
++	}
++}
++
+ TEEC_Result TEEC_InvokeCommand(TEEC_Session *session, uint32_t cmd_id,
+ 			TEEC_Operation *operation, uint32_t *error_origin)
+ {
+@@ -656,6 +752,8 @@ TEEC_Result TEEC_InvokeCommand(TEEC_Session *session, uint32_t cmd_id,
+ 	} buf;
+ 	struct tee_ioctl_buf_data buf_data;
+ 	TEEC_SharedMemory shm[TEEC_CONFIG_PAYLOAD_REF_COUNT];
++	const char *str __attribute__((unused)) = NULL;
++	static uint32_t count = 0;
+ 
+ 	memset(&buf, 0, sizeof(buf));
+ 	memset(&buf_data, 0, sizeof(buf_data));
+@@ -710,6 +808,12 @@ out_free_temp_refs:
  out:
  	if (error_origin)
  		*error_origin = eorig;
-+	EMSG("#####################################");
-+	EMSG("res = 0x%x, origin = 0x%x", res, eorig);
-+	EMSG("#####################################");
++
++	str = taf_to_str(cmd_id);
++	EMSG("#########################################################################");
++	EMSG("res = 0x%x, origin = 0x%x, cmd = %s, count = %u", res, eorig, str, count++);
++	EMSG("#########################################################################");
++
  	return res;
  }
  
+diff --git a/public/tee_client_api.h b/public/tee_client_api.h
+index 5c1e7d7..6955e8b 100644
+--- a/public/tee_client_api.h
++++ b/public/tee_client_api.h
+@@ -38,6 +38,97 @@ extern "C" {
+ #include <stdbool.h>
+ #include <limits.h>
+ 
++/* The function IDs implemented in this TA */
++#define OPTEE_WV_INITIALIZE                  1
++#define OPTEE_WV_TERMINATE                   2
++#define OPTEE_WV_INSTALLKEYBOX               3
++#define OPTEE_WV_INSTALLROOTKEYCERTIFICATE 103
++#define OPTEE_WV_GETKEYDATA                  4
++#define OPTEE_WV_ISKEYBOXVALID               5
++#define OPTEE_WV_ISROOTKEYCERTIFICATEVALID 105
++#define OPTEE_WV_GETRANDOM                   6
++#define OPTEE_WV_GETDEVICEID                 7
++#define OPTEE_WV_WRAPKEYBOX                  8
++#define OPTEE_WV_OPENSESSION                 9
++#define OPTEE_WV_CLOSESESSION               10
++#define OPTEE_WV_DECRYPTCTR_V10             11
++#define OPTEE_WV_GENERATEDERIVEDKEYS        12
++#define OPTEE_WV_GENERATESIGNATURE          13
++#define OPTEE_WV_GENERATENONCE              14
++#define OPTEE_WV_LOADKEYS_V8                15
++#define OPTEE_WV_REFRESHKEYS                16
++#define OPTEE_WV_SELECTKEY_V13              17
++#define OPTEE_WV_REWRAPDEVICERSAKEY         18
++#define OPTEE_WV_LOADDEVICERSAKEY           19
++#define OPTEE_WV_GENERATERSASIGNATURE_V8    20
++#define OPTEE_WV_DERIVEKEYSFROMSESSIONKEY   21
++#define OPTEE_WV_APIVERSION                 22
++#define OPTEE_WV_SECURITYLEVEL              23
++#define OPTEE_WV_GENERIC_ENCRYPT            24
++#define OPTEE_WV_GENERIC_DECRYPT            25
++#define OPTEE_WV_GENERIC_SIGN               26
++#define OPTEE_WV_GENERIC_VERIFY             27
++#define OPTEE_WV_GETHDCPCAPABILITY_V9       28
++#define OPTEE_WV_SUPPORTSUSAGETABLE         29
++#define OPTEE_WV_UPDATEUSAGETABLE           30
++#define OPTEE_WV_DEACTIVATEUSAGEENTRY_V12   31
++#define OPTEE_WV_REPORTUSAGE                32
++#define OPTEE_WV_DELETEUSAGEENTRY           33
++#define OPTEE_WV_DELETEUSAGETABLE           34
++#define OPTEE_WV_LOADKEYS_V9_OR_V10         35
++#define OPTEE_WV_GENERATERSASIGNATURE       36
++#define OPTEE_WV_GETMAXNUMBEROFSESSIONS     37
++#define OPTEE_WV_GETNUMBEROFOPENSESSIONS    38
++#define OPTEE_WV_ISANTIROLLBACKHWPRESENT    39
++#define OPTEE_WV_COPYBUFFER                 40
++#define OPTEE_WV_QUERYKEYCONTROL            41
++#define OPTEE_WV_LOADTESTKEYBOX_V13         42
++#define OPTEE_WV_FORCEDELETEUSAGEENTRY      43
++#define OPTEE_WV_GETHDCPCAPABILITY          44
++#define OPTEE_WV_LOADTESTRSAKEY             45
++#define OPTEE_WV_SECURITY_PATCH_LEVEL       46
++#define OPTEE_WV_LOADKEYS_V11_OR_V12        47
++#define OPTEE_WV_DECRYPTCENC                48
++#define OPTEE_WV_GETPROVISIONINGMETHOD      49
++#define OPTEE_WV_GETOEMPUBLICCERTIFICATE    50
++#define OPTEE_WV_REWRAPDEVICERSAKEY30       51
++#define OPTEE_WV_SUPPORTEDCERTIFICATES      52
++#define OPTEE_WV_ISSRMUPDATESUPPORTED       53
++#define OPTEE_WV_GETCURRENTSRMVERSION       54
++#define OPTEE_WV_LOADSRM                    55
++#define OPTEE_WV_LOADKEYS_V13               56
++#define OPTEE_WV_REMOVESRM                  57
++#define OPTEE_WV_CREATEUSAGETABLEHEADER     61
++#define OPTEE_WV_LOADUSAGETABLEHEADER       62
++#define OPTEE_WV_CREATENEWUSAGEENTRY        63
++#define OPTEE_WV_LOADUSAGEENTRY             64
++#define OPTEE_WV_UPDATEUSAGEENTRY           65
++#define OPTEE_WV_DEACTIVATEUSAGEENTRY       66
++#define OPTEE_WV_SHRINKUSAGETABLEHEADER     67
++#define OPTEE_WV_MOVEENTRY                  68
++#define OPTEE_WV_COPYOLDUSAGEENTRY          69
++#define OPTEE_WV_CREATEOLDUSAGEENTRY        70
++#define OPTEE_WV_GETANALOGOUTPUTFLAGS       71
++#define OPTEE_WV_LOADTESTKEYBOX             78
++#define OPTEE_WV_LOADENTITLEDCONTENTKEYS    79
++#define OPTEE_WV_SELECTKEY                  81
++#define OPTEE_WV_LOADKEYS                   83
++#define OPTEE_WV_SETDECRYPTHASH		    88
++#define OPTEE_WV_GETHASHERRORCODE	    89
++
++/* The expand TAFs ID implemented in this TA */
++#define OPTEE_WV_MESSAGEISVALID          1000
++#define OPTEE_WV_MANAGETIMER             1001
++#define OPTEE_WV_AUTHENTICATEKEYS        1002
++#define OPTEE_WV_REFRESHKEYSTATEANDTIMER 1003
++#define OPTEE_WV_GETRSAKEYSTRING         1004
++#define OPTEE_WV_IMPORTRSAKEY            1005
++#define OPTEE_WV_REWRAPRSAKEY            1006
++#define OPTEE_WV_LOADRSAKEY              1007
++#define OPTEE_WV_GETUSAGEENTRYLEN        1008
++
++const char *taf_to_str(uint32_t cmd_id);
++
+ /*
+  * Defines the number of available memory references in an open session or
+  * invoke command operation payload.
