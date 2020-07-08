@@ -1,0 +1,47 @@
+diff --git a/core/arch/arm/kernel/thread_optee_smc.c b/core/arch/arm/kernel/thread_optee_smc.c
+index dc4e93a9..6e981319 100644
+--- a/core/arch/arm/kernel/thread_optee_smc.c
++++ b/core/arch/arm/kernel/thread_optee_smc.c
+@@ -320,8 +320,14 @@ static struct mobj *thread_rpc_alloc_arg(size_t size)
+ 	if (!mobj)
+ 		goto err;
+ 
++	EMSG("##########");
++	EMSG("mobj is ok");
++	EMSG("##########");
+ 	return mobj;
+ err:
++	EMSG("###########");
++	EMSG("mobj is nok");
++	EMSG("###########");
+ 	thread_rpc_free_arg(co);
+ 	mobj_free(mobj);
+ 	return NULL;
+diff --git a/core/arch/arm/plat-imx/conf.mk b/core/arch/arm/plat-imx/conf.mk
+index 85b685a9..35562bab 100644
+--- a/core/arch/arm/plat-imx/conf.mk
++++ b/core/arch/arm/plat-imx/conf.mk
+@@ -433,6 +433,7 @@ endif
+ CFG_TZDRAM_SIZE ?= 0x01c00000
+ CFG_SHMEM_START ?= ($(CFG_TZDRAM_START) + $(CFG_TZDRAM_SIZE))
+ CFG_SHMEM_SIZE ?= 0x00400000
++#CFG_SHMEM_SIZE ?= 0x00800000
+ 
+ ifneq (,$(filter y, $(CFG_MX8MM) $(CFG_MX8MN) $(CFG_MX8MP) $(CFG_MX8MQ)))
+ CFG_IMX_TZC_NSEC_START ?= 0x0
+diff --git a/core/kernel/tee_ta_manager.c b/core/kernel/tee_ta_manager.c
+index 3740dff1..e8430c0d 100644
+--- a/core/kernel/tee_ta_manager.c
++++ b/core/kernel/tee_ta_manager.c
+@@ -758,6 +758,11 @@ TEE_Result tee_ta_invoke_command(TEE_ErrorOrigin *err,
+ 
+ 	set_invoke_timeout(sess, cancel_req_to);
+ 	res = sess->ctx->ops->enter_invoke_cmd(sess, cmd, param, err);
++	if (res) {
++		DMSG("###############");
++		DMSG("res = 0x%x", res);
++		DMSG("###############");
++	}
+ 
+ 	tee_ta_clear_busy(sess->ctx);
+ 
