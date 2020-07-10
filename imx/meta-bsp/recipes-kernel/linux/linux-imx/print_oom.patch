@@ -1,5 +1,5 @@
 diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-index c07b654ef797..bd299ce40b9c 100644
+index c07b654..bd299ce 100644
 --- a/drivers/tee/optee/call.c
 +++ b/drivers/tee/optee/call.c
 @@ -142,6 +142,8 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
@@ -69,9 +69,18 @@ index c07b654ef797..bd299ce40b9c 100644
  		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
  	}
 diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 3f01459529eb..39126ae0bcc7 100644
+index 68435f4..28846fd 100644
 --- a/drivers/tee/optee/core.c
 +++ b/drivers/tee/optee/core.c
+@@ -35,7 +35,7 @@
+ 
+ #define DRIVER_NAME "optee"
+ 
+-#define OPTEE_SHM_NUM_PRIV_PAGES	1
++#define OPTEE_SHM_NUM_PRIV_PAGES	4
+ 
+ /**
+  * optee_from_msg_param() - convert from OPTEE_MSG parameters to
 @@ -53,6 +53,8 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
  	struct tee_shm *shm;
  	phys_addr_t pa;
@@ -119,7 +128,7 @@ index 3f01459529eb..39126ae0bcc7 100644
  		goto err;
  	}
 diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
-index c6df4317ca9f..8bfcb8b00579 100644
+index c6df431..8bfcb8b 100644
 --- a/drivers/tee/optee/rpc.c
 +++ b/drivers/tee/optee/rpc.c
 @@ -154,11 +154,16 @@ static void handle_rpc_supp_cmd(struct tee_context *ctx,
@@ -246,7 +255,7 @@ index c6df4317ca9f..8bfcb8b00579 100644
  			(u32)OPTEE_SMC_RETURN_GET_RPC_FUNC(param->a0));
  		break;
 diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
-index df35fc01fd3e..4d33cbe943b5 100644
+index df35fc0..4d33cbe 100644
 --- a/drivers/tee/optee/supp.c
 +++ b/drivers/tee/optee/supp.c
 @@ -92,8 +92,14 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
@@ -278,7 +287,7 @@ index df35fc01fd3e..4d33cbe943b5 100644
  	list_del(&req->link);
  	req->busy = true;
 diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
-index 5bb93ca50399..11a5e08675f8 100644
+index 5bb93ca..11a5e08 100644
 --- a/drivers/tee/tee_core.c
 +++ b/drivers/tee/tee_core.c
 @@ -48,6 +48,7 @@ static struct tee_context *teedev_open(struct tee_device *teedev)
@@ -408,7 +417,7 @@ index 5bb93ca50399..11a5e08675f8 100644
  }
  EXPORT_SYMBOL_GPL(tee_client_invoke_func);
 diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-index 8164a1d0617d..82eded379af1 100644
+index 8164a1d..82eded3 100644
 --- a/drivers/tee/tee_shm.c
 +++ b/drivers/tee/tee_shm.c
 @@ -128,6 +128,8 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
@@ -437,7 +446,7 @@ index 8164a1d0617d..82eded379af1 100644
  		goto err;
  	}
 diff --git a/drivers/tee/tee_shm_pool.c b/drivers/tee/tee_shm_pool.c
-index fb4f8522a526..959a6387ff36 100644
+index fb4f852..959a638 100644
 --- a/drivers/tee/tee_shm_pool.c
 +++ b/drivers/tee/tee_shm_pool.c
 @@ -26,8 +26,10 @@ static int pool_op_gen_alloc(struct tee_shm_pool_mgr *poolm,
