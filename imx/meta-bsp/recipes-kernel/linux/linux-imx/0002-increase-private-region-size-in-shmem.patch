@@ -1,0 +1,26 @@
+From a3d6f2f82de93e099676d984b692cdd62816fea9 Mon Sep 17 00:00:00 2001
+From: Victor Chong <victor.chong@linaro.org>
+Date: Sat, 11 Jul 2020 02:00:12 +0900
+Subject: [PATCH 2/2] increase private region size in shmem
+
+---
+ drivers/tee/optee/core.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 65b02fa..610bc45 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -35,8 +35,7 @@
+ 
+ #define DRIVER_NAME "optee"
+ 
+-#define OPTEE_SHM_NUM_PRIV_PAGES	1
+-
++#define OPTEE_SHM_NUM_PRIV_PAGES	64
+ /**
+  * optee_from_msg_param() - convert from OPTEE_MSG parameters to
+  *			    struct tee_param
+-- 
+2.16.2
+

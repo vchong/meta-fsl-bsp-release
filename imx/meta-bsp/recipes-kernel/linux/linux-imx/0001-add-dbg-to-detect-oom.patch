@@ -1,0 +1,516 @@
+From 21717cfc753110783931fc093a301943a502c372 Mon Sep 17 00:00:00 2001
+From: Victor Chong <victor.chong@linaro.org>
+Date: Fri, 10 Jul 2020 22:53:56 +0900
+Subject: [PATCH 1/2] add dbg to detect oom
+
+---
+ drivers/tee/optee/call.c   | 13 +++++++++++++
+ drivers/tee/optee/core.c   | 15 ++++++++++++++-
+ drivers/tee/optee/rpc.c    | 29 ++++++++++++++++++++++++++++-
+ drivers/tee/optee/supp.c   | 12 ++++++++++--
+ drivers/tee/tee_core.c     | 38 +++++++++++++++++++++++++++++++++-----
+ drivers/tee/tee_shm.c      |  4 ++++
+ drivers/tee/tee_shm_pool.c | 13 ++++++++++---
+ 7 files changed, 112 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
+index c07b654..7fb106e 100644
+--- a/drivers/tee/optee/call.c
++++ b/drivers/tee/optee/call.c
+@@ -142,6 +142,8 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
+ 	struct optee_rpc_param param = { };
+ 	u32 ret;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	param.a0 = OPTEE_SMC_CALL_WITH_ARG;
+ 	reg_pair_from_64(&param.a1, &param.a2, parg);
+ 
+@@ -165,18 +167,21 @@ u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
+ 				 &res);
+ 
+ 		if (res.a0 == OPTEE_SMC_RETURN_ETHREAD_LIMIT) {
++			pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 			/*
+ 			 * Out of threads in secure world, wait for a thread
+ 			 * become available.
+ 			 */
+ 			optee_cq_wait_for_completion(&optee->call_queue, &w);
+ 		} else if (OPTEE_SMC_RETURN_IS_RPC(res.a0)) {
++			pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 			param.a0 = res.a0;
+ 			param.a1 = res.a1;
+ 			param.a2 = res.a2;
+ 			param.a3 = res.a3;
+ 			optee_handle_rpc(ctx, &param);
+ 		} else {
++			pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 			ret = res.a0;
+ 			break;
+ 		}
+@@ -271,6 +276,7 @@ int optee_open_session(struct tee_context *ctx,
+ 
+ 	sess = kzalloc(sizeof(*sess), GFP_KERNEL);
+ 	if (!sess) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		rc = -ENOMEM;
+ 		goto out;
+ 	}
+@@ -345,6 +351,9 @@ int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
+ 	phys_addr_t msg_parg;
+ 	struct optee_session *sess;
+ 	int rc;
++	static int count = 0;
++
++	pr_debug("%s %d %d \n", __FUNCTION__, __LINE__, count++);
+ 
+ 	/* Check that the session is valid */
+ 	mutex_lock(&ctxdata->mutex);
+@@ -365,12 +374,16 @@ int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
+ 	if (rc)
+ 		goto out;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	if (optee_do_call_with_arg(ctx, msg_parg)) {
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
+ 		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
+ 	}
+ 
+ 	if (optee_from_msg_param(param, arg->num_params, msg_arg->params)) {
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
+ 		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
+ 	}
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 68435f4..65b02fa 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -53,6 +53,8 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
+ 	struct tee_shm *shm;
+ 	phys_addr_t pa;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	for (n = 0; n < num_params; n++) {
+ 		struct tee_param *p = params + n;
+ 		const struct optee_msg_param *mp = msg_params + n;
+@@ -122,6 +124,8 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ 	size_t n;
+ 	phys_addr_t pa;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	for (n = 0; n < num_params; n++) {
+ 		const struct tee_param *p = params + n;
+ 		struct optee_msg_param *mp = msg_params + n;
+@@ -185,8 +189,10 @@ static int optee_open(struct tee_context *ctx)
+ 	struct optee *optee = tee_get_drvdata(teedev);
+ 
+ 	ctxdata = kzalloc(sizeof(*ctxdata), GFP_KERNEL);
+-	if (!ctxdata)
++	if (!ctxdata) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return -ENOMEM;
++	}
+ 
+ 	if (teedev == optee->supp_teedev) {
+ 		bool busy = true;
+@@ -397,6 +403,11 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
+ 	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+ 	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+ 
++	pr_notice("########");
++	pr_notice("size = %zu, priv_info.size = %zu\n", size, priv_info.size);
++	pr_notice("dmabuf_info.size = %zu\n", dmabuf_info.size);
++	pr_notice("########");
++
+ 	pool = tee_shm_pool_alloc_res_mem(&priv_info, &dmabuf_info);
+ 	if (IS_ERR(pool)) {
+ 		memunmap(va);
+@@ -443,6 +454,7 @@ static int optee_outercache_mutex(optee_invoke_fn *invoke_fn)
+ 	vaddr = memremap(paddr, sizeof(u32), MEMREMAP_WB);
+ 	if (vaddr == NULL) {
+ 		pr_warn("TZ l2cc mutex: ioremap failed\n");
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+@@ -564,6 +576,7 @@ static struct optee *optee_probe(struct device_node *np)
+ 
+ 	optee = kzalloc(sizeof(*optee), GFP_KERNEL);
+ 	if (!optee) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		rc = -ENOMEM;
+ 		goto err;
+ 	}
+diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
+index c6df431..02954c1 100644
+--- a/drivers/tee/optee/rpc.c
++++ b/drivers/tee/optee/rpc.c
+@@ -154,11 +154,16 @@ static void handle_rpc_supp_cmd(struct tee_context *ctx,
+ {
+ 	struct tee_param *params;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	arg->ret_origin = TEEC_ORIGIN_COMMS;
+ 
+ 	params = kmalloc_array(arg->num_params, sizeof(struct tee_param),
+ 			       GFP_KERNEL);
+ 	if (!params) {
++		pr_info("#####################################\n");
++		pr_info("handle_rpc_supp_cmd kmalloc_array oom\n");
++		pr_info("#####################################\n");
+ 		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
+ 		return;
+ 	}
+@@ -189,8 +194,10 @@ static struct tee_shm *cmd_alloc_suppl(struct tee_context *ctx, size_t sz)
+ 	param.u.value.c = 0;
+ 
+ 	ret = optee_supp_thrd_req(ctx, OPTEE_MSG_RPC_CMD_SHM_ALLOC, 1, &param);
+-	if (ret)
++	if (ret) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return ERR_PTR(-ENOMEM);
++	}
+ 
+ 	mutex_lock(&optee->supp.mutex);
+ 	/* Increases count as secure world doesn't have a reference */
+@@ -207,6 +214,8 @@ static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
+ 	size_t sz;
+ 	size_t n;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	arg->ret_origin = TEEC_ORIGIN_COMMS;
+ 
+ 	if (!arg->num_params ||
+@@ -236,6 +245,9 @@ static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
+ 	}
+ 
+ 	if (IS_ERR(shm)) {
++		pr_info("#############################################\n");
++		pr_info("handle_rpc_func_cmd_shm_alloc IS_ERR(shm) oom\n");
++		pr_info("#############################################\n");
+ 		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
+ 		return;
+ 	}
+@@ -312,6 +324,8 @@ static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
+ {
+ 	struct optee_msg_arg *arg;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	arg = tee_shm_get_va(shm, 0);
+ 	if (IS_ERR(arg)) {
+ 		pr_err("%s: tee_shm_get_va %p failed\n", __func__, shm);
+@@ -320,21 +334,27 @@ static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
+ 
+ 	switch (arg->cmd) {
+ 	case OPTEE_MSG_RPC_CMD_GET_TIME:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		handle_rpc_func_cmd_get_time(arg);
+ 		break;
+ 	case OPTEE_MSG_RPC_CMD_WAIT_QUEUE:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		handle_rpc_func_cmd_wq(optee, arg);
+ 		break;
+ 	case OPTEE_MSG_RPC_CMD_SUSPEND:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		handle_rpc_func_cmd_wait(arg);
+ 		break;
+ 	case OPTEE_MSG_RPC_CMD_SHM_ALLOC:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		handle_rpc_func_cmd_shm_alloc(ctx, arg);
+ 		break;
+ 	case OPTEE_MSG_RPC_CMD_SHM_FREE:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		handle_rpc_func_cmd_shm_free(ctx, arg);
+ 		break;
+ 	default:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		handle_rpc_supp_cmd(ctx, arg);
+ 	}
+ }
+@@ -353,8 +373,11 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
+ 	struct tee_shm *shm;
+ 	phys_addr_t pa;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	switch (OPTEE_SMC_RETURN_GET_RPC_FUNC(param->a0)) {
+ 	case OPTEE_SMC_RPC_FUNC_ALLOC:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		shm = tee_shm_alloc(ctx, param->a1, TEE_SHM_MAPPED);
+ 		if (!IS_ERR(shm) && !tee_shm_get_pa(shm, 0, &pa)) {
+ 			reg_pair_from_64(&param->a1, &param->a2, pa);
+@@ -368,10 +391,12 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
+ 		}
+ 		break;
+ 	case OPTEE_SMC_RPC_FUNC_FREE:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		shm = reg_pair_to_ptr(param->a1, param->a2);
+ 		tee_shm_free(shm);
+ 		break;
+ 	case OPTEE_SMC_RPC_FUNC_FOREIGN_INTR:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		/*
+ 		 * A foreign interrupt was raised while secure world was
+ 		 * executing, since they are handled in Linux a dummy RPC is
+@@ -380,10 +405,12 @@ void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
+ 		 */
+ 		break;
+ 	case OPTEE_SMC_RPC_FUNC_CMD:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		shm = reg_pair_to_ptr(param->a1, param->a2);
+ 		handle_rpc_func_cmd(ctx, optee, shm);
+ 		break;
+ 	default:
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		pr_warn("Unknown RPC func 0x%x\n",
+ 			(u32)OPTEE_SMC_RETURN_GET_RPC_FUNC(param->a0));
+ 		break;
+diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+index df35fc0..2524b76 100644
+--- a/drivers/tee/optee/supp.c
++++ b/drivers/tee/optee/supp.c
+@@ -92,8 +92,14 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+ 	bool interruptable;
+ 	u32 ret;
+ 
+-	if (!req)
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
++	if (!req) {
++		pr_info("#####################################\n");
++		pr_info("optee_supp_thrd_req oom\n");
++		pr_info("#####################################\n");
+ 		return TEEC_ERROR_OUT_OF_MEMORY;
++	}
+ 
+ 	init_completion(&req->c);
+ 	req->func = func;
+@@ -172,8 +178,10 @@ static struct optee_supp_req  *supp_pop_entry(struct optee_supp *supp,
+ 	}
+ 
+ 	*id = idr_alloc(&supp->idr, req, 1, 0, GFP_KERNEL);
+-	if (*id < 0)
++	if (*id < 0) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return ERR_PTR(-ENOMEM);
++	}
+ 
+ 	list_del(&req->link);
+ 	req->busy = true;
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index 5bb93ca..86b4a47 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -48,6 +48,7 @@ static struct tee_context *teedev_open(struct tee_device *teedev)
+ 
+ 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		rc = -ENOMEM;
+ 		goto err;
+ 	}
+@@ -313,8 +314,10 @@ static int tee_ioctl_open_session(struct tee_context *ctx,
+ 	if (arg.num_params) {
+ 		params = kcalloc(arg.num_params, sizeof(struct tee_param),
+ 				 GFP_KERNEL);
+-		if (!params)
++		if (!params) {
++			pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 			return -ENOMEM;
++		}
+ 		uparams = uarg->params;
+ 		rc = params_from_user(ctx, params, arg.num_params, uparams);
+ 		if (rc)
+@@ -363,6 +366,9 @@ static int tee_ioctl_invoke(struct tee_context *ctx,
+ 	struct tee_ioctl_invoke_arg arg;
+ 	struct tee_ioctl_param __user *uparams = NULL;
+ 	struct tee_param *params = NULL;
++	static int count = 0;
++
++	pr_debug("%s %d %d \n", __FUNCTION__, __LINE__, count++);
+ 
+ 	if (!ctx->teedev->desc->ops->invoke_func)
+ 		return -EINVAL;
+@@ -384,14 +390,18 @@ static int tee_ioctl_invoke(struct tee_context *ctx,
+ 	if (arg.num_params) {
+ 		params = kcalloc(arg.num_params, sizeof(struct tee_param),
+ 				 GFP_KERNEL);
+-		if (!params)
++		if (!params) {
++			pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 			return -ENOMEM;
++		}
+ 		uparams = uarg->params;
++		pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 		rc = params_from_user(ctx, params, arg.num_params, uparams);
+ 		if (rc)
+ 			goto out;
+ 	}
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 	rc = ctx->teedev->desc->ops->invoke_func(ctx, &arg, params);
+ 	if (rc)
+ 		goto out;
+@@ -401,6 +411,8 @@ static int tee_ioctl_invoke(struct tee_context *ctx,
+ 		rc = -EFAULT;
+ 		goto out;
+ 	}
++
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
+ 	rc = params_to_user(uparams, arg.num_params, params);
+ out:
+ 	if (params) {
+@@ -516,8 +528,10 @@ static int tee_ioctl_supp_recv(struct tee_context *ctx,
+ 		return -EINVAL;
+ 
+ 	params = kcalloc(num_params, sizeof(struct tee_param), GFP_KERNEL);
+-	if (!params)
++	if (!params) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return -ENOMEM;
++	}
+ 
+ 	rc = params_from_user(ctx, params, num_params, uarg->params);
+ 	if (rc)
+@@ -615,8 +629,10 @@ static int tee_ioctl_supp_send(struct tee_context *ctx,
+ 		return -EINVAL;
+ 
+ 	params = kcalloc(num_params, sizeof(struct tee_param), GFP_KERNEL);
+-	if (!params)
++	if (!params) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return -ENOMEM;
++	}
+ 
+ 	rc = params_from_supp(params, num_params, uarg->params);
+ 	if (rc)
+@@ -706,6 +722,7 @@ struct tee_device *tee_device_alloc(const struct tee_desc *teedesc,
+ 
+ 	teedev = kzalloc(sizeof(*teedev), GFP_KERNEL);
+ 	if (!teedev) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		ret = ERR_PTR(-ENOMEM);
+ 		goto err;
+ 	}
+@@ -720,6 +737,7 @@ struct tee_device *tee_device_alloc(const struct tee_desc *teedesc,
+ 	spin_unlock(&driver_lock);
+ 
+ 	if (teedev->id >= TEE_NUM_DEVICES) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		ret = ERR_PTR(-ENOMEM);
+ 		goto err;
+ 	}
+@@ -956,6 +974,10 @@ struct tee_context *tee_client_open_context(struct tee_context *start,
+ 		put_dev = dev;
+ 
+ 		ctx = teedev_open(container_of(dev, struct tee_device, dev));
++
++		if (PTR_ERR(ctx) == -ENOMEM) {
++			pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
++		}
+ 	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
+ 
+ 	put_device(put_dev);
+@@ -1000,8 +1022,14 @@ int tee_client_invoke_func(struct tee_context *ctx,
+ 			struct tee_ioctl_invoke_arg *arg,
+ 			struct tee_param *param)
+ {
+-	if (!ctx->teedev->desc->ops->invoke_func)
++	static int count = 0;
++
++	pr_debug("%s %d %d \n", __FUNCTION__, __LINE__, count++);
++
++	if (!ctx->teedev->desc->ops->invoke_func) {
++		pr_debug("NO invoke_func AVAILABLE");
+ 		return -EINVAL;
++	}
+ 	return ctx->teedev->desc->ops->invoke_func(ctx, arg, param);
+ }
+ EXPORT_SYMBOL_GPL(tee_client_invoke_func);
+diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
+index 8164a1d..c28fff0 100644
+--- a/drivers/tee/tee_shm.c
++++ b/drivers/tee/tee_shm.c
+@@ -128,6 +128,8 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
+ 	void *ret;
+ 	int rc;
+ 
++	pr_debug("%s %d \n", __FUNCTION__, __LINE__);
++
+ 	if (!(flags & TEE_SHM_MAPPED)) {
+ 		dev_err(teedev->dev.parent,
+ 			"only mapped allocations supported\n");
+@@ -150,6 +152,7 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
+ 
+ 	shm = kzalloc(sizeof(*shm), GFP_KERNEL);
+ 	if (!shm) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		ret = ERR_PTR(-ENOMEM);
+ 		goto err_dev_put;
+ 	}
+@@ -220,6 +223,7 @@ struct tee_shm *tee_shm_register_fd(struct tee_context *ctx, int fd)
+ 
+ 	ref = kzalloc(sizeof(*ref), GFP_KERNEL);
+ 	if (!ref) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		rc = ERR_PTR(-ENOMEM);
+ 		goto err;
+ 	}
+diff --git a/drivers/tee/tee_shm_pool.c b/drivers/tee/tee_shm_pool.c
+index fb4f852..7974783 100644
+--- a/drivers/tee/tee_shm_pool.c
++++ b/drivers/tee/tee_shm_pool.c
+@@ -26,8 +26,10 @@ static int pool_op_gen_alloc(struct tee_shm_pool_mgr *poolm,
+ 	size_t s = roundup(size, 1 << genpool->min_alloc_order);
+ 
+ 	va = gen_pool_alloc(genpool, s);
+-	if (!va)
++	if (!va) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return -ENOMEM;
++	}
+ 
+ 	memset((void *)va, 0, s);
+ 	shm->kaddr = (void *)va;
+@@ -71,8 +73,10 @@ static int pool_res_mem_mgr_init(struct tee_shm_pool_mgr *mgr,
+ 		return -EINVAL;
+ 
+ 	genpool = gen_pool_create(min_alloc_order, -1);
+-	if (!genpool)
++	if (!genpool) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		return -ENOMEM;
++	}
+ 
+ 	gen_pool_set_algo(genpool, gen_pool_best_fit, NULL);
+ 	rc = gen_pool_add_virt(genpool, info->vaddr, info->paddr, info->size,
+@@ -109,6 +113,7 @@ tee_shm_pool_alloc_res_mem(struct tee_shm_pool_mem_info *priv_info,
+ 
+ 	pool = kzalloc(sizeof(*pool), GFP_KERNEL);
+ 	if (!pool) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		ret = -ENOMEM;
+ 		goto err;
+ 	}
+@@ -132,8 +137,10 @@ tee_shm_pool_alloc_res_mem(struct tee_shm_pool_mem_info *priv_info,
+ 	pool->destroy = pool_res_mem_destroy;
+ 	return pool;
+ err:
+-	if (ret == -ENOMEM)
++	if (ret == -ENOMEM) {
++		pr_debug("%s %d enomem \n", __FUNCTION__, __LINE__);
+ 		pr_err("%s: can't allocate memory for res_mem shared memory pool\n", __func__);
++	}
+ 	if (pool && pool->private_mgr.private_data)
+ 		gen_pool_destroy(pool->private_mgr.private_data);
+ 	kfree(pool);
+-- 
+2.16.2
+
