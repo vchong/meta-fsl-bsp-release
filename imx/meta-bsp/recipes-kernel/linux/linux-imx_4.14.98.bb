@@ -60,7 +60,7 @@ SRC_URI += "file://0048-MMIOT-192-Remove-CONFIG_MXC_HANTRO_SECURE-by-default.pat
 SRC_URI += "file://0049-hantrodec-driver-init-start-level-set-to-late-init.patch;md5sum=a89e90044ccdaf5509b4f226847d7de7" 
 SRC_URI += "file://0050-Hantro-secure-decoder-add-performance-counters.patch;md5sum=73bf0f623a6defe76257c97bd9460ed7" 
 SRC_URI += "file://0051-MMIOT-413-Add-fsl-imx8mq-evk-optee.dts.patch;md5sum=7fae08e2b0c33356fb18d00fefe1e089" 
-SRC_URI += "file://0001-add-dbg-to-detect-oom.patch"
+#SRC_URI += "file://0001-add-dbg-to-detect-oom.patch"
 SRC_URI += "file://0002-increase-private-region-size-in-shmem.patch"
 
 SRC_URI += "file://secure_vpu.cfg"
