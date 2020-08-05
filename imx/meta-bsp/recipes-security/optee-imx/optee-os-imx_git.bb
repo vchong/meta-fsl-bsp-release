@@ -114,6 +114,7 @@ do_compile () {
     #export CFG_CORE_HEAP_SIZE="131072"
     export CFG_CORE_HEAP_SIZE="262144"
     #export CFG_CORE_HEAP_SIZE="524288"
+    export CFG_NUM_THREADS="4"
     #oe_runmake -C ${S} all CFG_TEE_TA_LOG_LEVEL=0
     #oe_runmake -C ${S} all CFG_TEE_CORE_LOG_LEVEL=3 CFG_TEE_TA_LOG_LEVEL=3 DEBUG=1
     oe_runmake -C ${S} all CFG_TEE_CORE_LOG_LEVEL=1 CFG_TEE_TA_LOG_LEVEL=1 DEBUG=1
