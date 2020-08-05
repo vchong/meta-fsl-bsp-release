@@ -39,7 +39,7 @@ index b03fa65..c7a758b 100644
 +	$(CFG_MX6S) $(CFG_MX6SX) $(CFG_MX7ULP) $(CFG_MX8MQ) $(CFG_MX8MM)), y)
 +$(eval $(call cryphw-enable-drv-hw, RSA))
 +endif
-+
++$(eval $(call cryphw-enable-drv-hw, RSA))
  $(call force, CFG_NXP_CAAM_ACIPHER_DRV, $(call cryphw-one-enabled, ECC RSA DH))
  
  ifeq ($(CFG_IMX_DEK_HAB),y)
